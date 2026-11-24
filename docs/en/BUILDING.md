@@ -235,6 +235,14 @@ repository.
 | `meleenet-launcher.exe --check --out <log>` | asks GitHub for the newest release and writes what came |
 | `meleenet-launcher.exe --where --out <log>` | writes where the launcher would find the game and what is installed in it |
 
+An update can be checked without a real release. `tools/lab/newer_release.py <launcher> <folder> <mod version>
+<launcher version>` makes a "newer release" out of a built launcher — a copy whose package index names other
+versions, and the `meleenet-latest.json` for it; `tools/lab/serve_release.py <port> <folder>` serves that folder
+the way GitHub serves a release page. The launcher takes the stand-in's address from
+`--repo http://127.0.0.1:<port>/r`. Put the launcher's copy into a folder of its own: updating, it replaces its
+own file. With its own `--settings` the launcher does not look for the game itself: show it the folder in the
+script's first step (`until:nogame:8000;click:primary` with `--pick`).
+
 ## What is not in the repository
 
 - Files of the game, and the Steamworks SDK.
