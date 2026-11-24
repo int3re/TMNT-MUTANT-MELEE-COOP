@@ -295,8 +295,9 @@ no window on the screen. What is checked and what is not:
   Steam, with lost packets; the whole way through the menus (create a game → join → start → a fight); copies
   with different shapes of the frame; version 0.1.1 against 0.1.0; the logs of all copies matched frame for
   frame. The menus that fill the frame were pictured on 16:9, 16:10 and 21:9;
-- **checked by a run with no window on the screen:** the launcher finds a new version itself, downloads it, checks
-  it, takes its place and installs the mod — against a stand-in for the release page on the same PC;
+- **checked by a real run, with no window on the screen:** updating from the real GitHub — a launcher of the
+  earlier version found this release itself, downloaded it, checked it, took its place and installed the mod
+  0.1.1 over 0.1.0;
 - **not checked yet:** a game between real Steam accounts; the real window in front — the keyboard, the mouse
   buttons, typing an address; gamepads; a pause in a network game; long games; a guest leaving in the middle
   of a fight.
