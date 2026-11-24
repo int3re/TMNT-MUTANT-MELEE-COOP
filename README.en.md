@@ -344,9 +344,9 @@ no window on the screen. What is checked and what is not:
   - the pause: a guest pauses and goes on with the fight, the player who leads the menus leaves the fight;
   - frame skipping: one copy of two needed 30 ms more for every picture — with the setting on both played the
     fight at 60 frames a second, with it off both at 29;
-- **checked by a real run, with no window on the screen (on release 0.1.1):** updating from the real GitHub —
-  a launcher of the earlier version found the release itself, downloaded it, checked it, took its place and
-  installed the mod 0.1.1 over 0.1.0;
+- **checked by a real run, with no window on the screen (on release 0.2.0):** updating from the real GitHub —
+  the released launcher 1.1.0 found this release itself, downloaded launcher 1.2.0, checked it, took its place
+  and installed the mod 0.2.0 over 0.1.1; the player's settings in `meleenet.ini` stayed the player's;
 - **not checked by a real game yet:** Steam on real accounts; the real window in front — the keyboard, the
   mouse buttons, typing an address; gamepads; long sessions; every stage of the story.
 
