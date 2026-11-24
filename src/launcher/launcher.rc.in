@@ -1,0 +1,47 @@
+#include "@CMAKE_SOURCE_DIR@/src/launcher/res.h"
+
+// (no language of their own: found whatever Windows speaks, and replaceable in tests)
+LANGUAGE 0, 0
+
+IDI_APP ICON "@CMAKE_SOURCE_DIR@/src/launcher/assets/launcher.ico"
+
+RES_FONT_ONEST_400 RCDATA "@LAUNCHER_FONTS@/Onest-Regular.ttf"
+RES_FONT_ONEST_500 RCDATA "@LAUNCHER_FONTS@/Onest-Medium.ttf"
+RES_FONT_ONEST_600 RCDATA "@LAUNCHER_FONTS@/Onest-SemiBold.ttf"
+RES_FONT_ONEST_700 RCDATA "@LAUNCHER_FONTS@/Onest-Bold.ttf"
+RES_FONT_MONO_500 RCDATA "@LAUNCHER_FONTS@/JetBrainsMono-Medium.ttf"
+RES_FONT_MONO_700 RCDATA "@LAUNCHER_FONTS@/JetBrainsMono-Bold.ttf"
+@LAUNCHER_DISPLAY_RC@
+
+// The mod inside (package.cpp): its description, the list of its files, the files.
+RES_PKG_INFO RCDATA "@CMAKE_SOURCE_DIR@/dist/release.json"
+RES_PKG_INDEX RCDATA "@CMAKE_BINARY_DIR@/package-index.txt"
+301 RCDATA "@PAYLOAD_DIR@/dinput8.dll"
+302 RCDATA "@PAYLOAD_DIR@/meleenet.asi"
+@PKG_STEAM_RC@
+304 RCDATA "@PAYLOAD_DIR@/meleenet.ini"
+305 RCDATA "@PAYLOAD_DIR@/README.md"
+
+1 VERSIONINFO
+FILEVERSION @LAUNCHER_VERSION_COMMAS@,0
+PRODUCTVERSION @LAUNCHER_VERSION_COMMAS@,0
+FILEOS 0x40004L
+FILETYPE 0x1L
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "FileDescription", "meleenet - TMNT Mutant Melee online co-op mod, its launcher and installer"
+      VALUE "ProductName", "meleenet"
+      VALUE "FileVersion", "@LAUNCHER_VERSION@"
+      VALUE "ProductVersion", "@LAUNCHER_VERSION@ (mod @MOD_VERSION@)"
+      VALUE "OriginalFilename", "meleenet-launcher.exe"
+      VALUE "LegalCopyright", "MIT License. Unofficial fan mod."
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x0409, 1200
+  END
+END

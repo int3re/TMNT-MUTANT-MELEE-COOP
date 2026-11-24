@@ -1,0 +1,29 @@
+# Build output
+/build/
+/out/
+CMakeUserPresets.json
+
+# Visual Studio
+.vs/
+*.user
+
+# Release archives are published on the Releases page, not in the repository
+*.zip
+
+# Never part of the repository: the Steamworks SDK and files of the game
+/steamworks_sdk*/
+ztmnt.exe
+archive.arc
+archive.dat
+
+# The game's exe taken apart (a memory of the work, not a part of the mod) and what the lab leaves
+/re/dump/
+/re/shots/
+/re/old/
+__pycache__/
+
+# What the mod writes next to the game
+meleenet.log
+meleenet-menu.log
+meleenet-sim.log
+meleenet-rng.log
