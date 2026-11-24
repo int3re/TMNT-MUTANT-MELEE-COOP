@@ -30,6 +30,17 @@ pause.
 **In a network game each player uses these keys** on their own computer — whichever of the four players
 they are.
 
+### The pause in a network game
+
+- Esc of **any** player pauses the fight — for everybody at once.
+- Any player's Esc or Enter goes on with the fight.
+- The pause menu's second row — leave the fight — stays with the player who leads the menus: the one who
+  chose the fight in the main menu. While the highlight is on that row, the other players' Esc and Enter do
+  nothing.
+
+Before version 0.2.0 only the player who leads the menus could pause. Checked in the lab: a guest pauses and
+goes on with the fight, the leader leaves the fight. Not checked with a real keyboard in a window in front.
+
 ## Changing the keys
 
 <p align="center">

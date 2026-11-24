@@ -26,6 +26,11 @@ def compare(copies, show=4):
     for k in range(1, len(logs)):
         for i in range(n):
             if logs[0][i] != logs[k][i]:
+                if i >= n - 3:
+                    # (the copies end at the same frame, and a guest is a frame or two ahead of the host: it is
+                    # gone when the host plays its last frames)
+                    print("copy %d: the last %d frame(s) differ - the copies were leaving" % (k + 1, n - i))
+                    break
                 print("copy %d DIFFERS from the host at line %d:" % (k + 1, i + 1))
                 for j in range(max(0, i - 1), min(n, i + show)):
                     print("  host " + logs[0][j])
@@ -80,6 +85,8 @@ def main(argv):
             if line.startswith("asi = "):
                 asi = line[6:]
                 merged["debug"].remove(line)
+        if merged.get("video"):  # (into the [video] section above: a second one would not be read)
+            ini = ini.replace("[net]\n", "\n".join(merged.pop("video")) + "\n[net]\n", 1)
         ini += "\n".join(merged.pop("net", [])) + "\n"
         ini += lab.GUARD + "autoquit_frame = %d\nscript = lab-script.txt\nsim_log = 1\nnet_players = %d\n" % (frames, players)
         if via == "mock":

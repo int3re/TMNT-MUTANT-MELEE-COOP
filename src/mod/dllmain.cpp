@@ -14,10 +14,12 @@
 #include "common/version.h"
 #include "mod/config.h"
 #include "mod/diag.h"
+#include "mod/digits.h"
 #include "mod/game.h"
 #include "mod/input.h"
 #include "mod/menu.h"
 #include "mod/netlobby.h"
+#include "mod/story.h"
 #include "mod/netplay.h"
 #include "mod/notice.h"
 #include "mod/sim.h"
@@ -74,6 +76,8 @@ void init(const char* how) {
   video::install(g_cfg);
   input::install(g_cfg);
   sim::install(g_cfg);
+  story::install(g_cfg);
+  digits::install(g_cfg);
   LOGI("meleenet ready");
 }
 

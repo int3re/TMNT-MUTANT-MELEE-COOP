@@ -58,7 +58,7 @@ bool load_config(const std::wstring& path, Config& cfg) {
   cfg.menu_bars = get(path, L"video", L"menus", "wide") == "bars";
   cfg.window_w = get_int(path, L"video", L"window_width", 0);
   cfg.window_h = get_int(path, L"video", L"window_height", 0);
-  cfg.vsync = get_bool(path, L"video", L"vsync", true);
+  cfg.frame_skip = get_bool(path, L"video", L"frame_skip", true);
   cfg.antialiasing = get_int(path, L"video", L"antialiasing", 4);
   cfg.anisotropy = get_int(path, L"video", L"anisotropy", 16);
   cfg.toon = get_int(path, L"video", L"toon_shading", -1);
@@ -98,6 +98,7 @@ bool load_config(const std::wstring& path, Config& cfg) {
     if (sscanf(t.c_str(), "%f,%f", &a, &b) == 2)
       cfg.net_stall_at_ms = static_cast<unsigned>(a * 1000), cfg.net_stall_ms = static_cast<unsigned>(b * 1000);
   }
+  cfg.net_outage_once = get_bool(path, L"debug", L"net_outage_once", false);
   cfg.net_quit_ms = static_cast<unsigned>(get_int(path, L"debug", L"net_quit", 0)) * 1000;
 
   cfg.autoquit_s = get_int(path, L"debug", L"autoquit", 0);
@@ -117,9 +118,18 @@ bool load_config(const std::wstring& path, Config& cfg) {
   cfg.unlock = get_bool(path, L"debug", L"unlock", false);
   cfg.movies = get_bool(path, L"debug", L"movies", true);
   cfg.mode_log = get_bool(path, L"debug", L"mode_log", true);
+  cfg.lab_draw_every = static_cast<unsigned>(get_int(path, L"debug", L"draw_every", 0));
+  cfg.lab_story_open = get_bool(path, L"debug", L"story_open", false);
+  cfg.lab_ko_enemies = static_cast<unsigned>(get_int(path, L"debug", L"ko_enemies", 0));
+  cfg.lab_ko_hero = static_cast<unsigned>(get_int(path, L"debug", L"ko_hero", 0));
+  cfg.lab_ko_partners = static_cast<unsigned>(get_int(path, L"debug", L"ko_partners", 0));
+  cfg.lab_desync_at = static_cast<unsigned>(get_int(path, L"debug", L"desync_at", 0));
+  cfg.lab_draw_cost_ms = static_cast<unsigned>(get_int(path, L"debug", L"draw_cost", 0));
   cfg.lab_epoch = get_bool(path, L"debug", L"epoch", false);
+  cfg.lab_epoch_boot = get_bool(path, L"debug", L"epoch_boot", false);
   cfg.lab_notice = static_cast<unsigned>(get_int(path, L"debug", L"notice", 0));
   cfg.lab_page = get_bool(path, L"debug", L"page", false);
+  cfg.lab_autoquit_players = get_int(path, L"debug", L"autoquit_players", 0);
   cfg.lab_address = get_bool(path, L"debug", L"address", false);
   cfg.lab_keep_modes = get_bool(path, L"debug", L"keep_modes", false);
   cfg.lab_epoch_at = static_cast<unsigned>(get_int(path, L"debug", L"epoch_at", 0));

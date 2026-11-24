@@ -170,6 +170,14 @@ void widen_rect(std::vector<Line>& ls, const char* xywh, const char* uvwh, const
   Line* r_line = find(ls, xywh);
   float r[4];
   if (!r_line || !four(*r_line, r) || r[2] <= 0) return;
+  // A black border that stands over the layout's edge (the story's results) stands over the picture's
+  // edge instead: as narrow as it was, not pulled across the wall beside it.
+  if (asset == "bb_black" && ((r[0] < 0 && r[0] + r[2] > 0 && r[0] + r[2] <= 80) ||
+                             (r[0] >= kWidth - 80 && r[0] < kWidth && r[0] + r[2] > kWidth))) {
+    r[0] += r[0] < 0 ? -extra : extra;
+    put_four(*r_line, r);
+    return;
+  }
   if (move_out(r, extra)) {
     put_four(*r_line, r);
     return;

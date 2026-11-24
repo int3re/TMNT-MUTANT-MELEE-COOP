@@ -10,6 +10,7 @@ only on versions with the same one. Version 0.1.0 was not published; the first p
 
 | Version | Launcher | Protocol | Date | In a line |
 |---|---|---|---|---|
+| [0.2.0](#020) | 1.2.0 | 2 | 24 Nov 2026 | the story together; coming into a running game; anybody's pause; frame skipping; a real 4 and 6 |
 | [0.1.1](#011) | 1.1.0 | 1 | 24 Nov 2026 | menus fill a wide frame; the launcher has a look of its own and updates the mod and itself |
 | [0.1.0](#010) | 1.0.0 | 1 | 23 Nov 2026 | the first network game, a window and a wide frame, the first launcher |
 
@@ -17,7 +18,98 @@ Who plays with whom over the network:
 
 | Versions | Protocol | Together |
 |---|---|---|
+| 0.2.0 | 2 | with 0.2.0 only; does not play with 0.1.x |
 | 0.1.0 – 0.1.1 | 1 | play with each other |
+
+## 0.2.0
+
+Launcher 1.2.0. Protocol 2: it does not play with 0.1.0 or 0.1.1 over the network — every player has to
+update.
+
+Everything listed here was checked in the lab only: two to four copies of the game on one computer, with no
+window on the screen, by address and through the stand-in for Steam. Real Steam accounts, a real focused
+window, gamepads and long sessions are still not checked.
+
+- **The story is played together.** In a network game ИСТОРИЯ (Story) is for everybody. The player who chose
+  it in the main menu leads: chooses the hero and moves on the map, as before. In every match the other
+  players fight beside the hero as partners. A partner plays a turtle by the player's number: 1 Leonardo, 2
+  Raphael, 3 Donatello, 4 Michelangelo; a partner whose turtle is the story's hero takes the first turtle
+  nobody has. A partner cannot choose a fighter yet.
+  - Partners are on the hero's side by the game's own team rules: team-mates cannot hurt each other, enemies
+    attack them too, each has a panel in the HUD (when all four panels are the enemies', a partner takes one
+    of theirs), and each starts with the same health as the hero.
+  - "Last man standing" matches are played by the game's team rules when partners are in: a side wins when
+    the other side is down, and the hero's fall alone does not end the match — a partner can finish it. In
+    the other match types the story's own rules stay as written: where the hero's knock-out ends a match, it
+    still does, partners or not.
+  - These stay for the hero alone (the partners watch, their fighters are not in): the training matches with
+    the mecha turtle, the bomb match and the other mini-games, the four matches where an enemy comes back as
+    another one (the last stages of Leonardo, Raphael, Donatello and Casey: Shredder), and matches that
+    already use all eight places.
+  - Progress and unlocks are the host's save, as before.
+- **A player can come into a game that is being played, and come back after a lost link.** The host's game
+  stays open while it is played. In ИГРЫ ДРУЗЕЙ В STEAM (Friends' games on Steam) it is marked «ИДЕТ ИГРА»
+  (a game is going on) and can be chosen (before, a game that was being played could not be); by address it
+  is joined the same way as before.
+  - The newcomer waits on the network page: the row says ВОЙДЕТЕ ПОСЛЕ БОЯ (you come in after the fight), the
+    small line «У ХОСТА ИДЕТ ИГРА: МЕЖДУ БОЯМИ ОНА НАЧНЕТСЯ ЗАНОВО, УЖЕ С ВАМИ» (the host is playing: between
+    two fights the game starts again with you in). When a fight is going on, the host sees the notice «НОВЫЙ
+    ИГРОК ЖДЕТ: ОН ВОЙДЕТ ПОСЛЕ БОЯ» (a new player waits: they come in after the fight).
+  - When the session is between two fights (the main menu, the choice of a hero, of an arena and of a fight's
+    options, the story's choice of a hero, the story's map), every game — the newcomer's too — closes and
+    starts again into a session of all of them, exactly as at the first start. A fight is never interrupted
+    for it. After that start the games are at the main menu; a story goes on from what the host's save holds.
+  - A player whose link was lost, or who closed the game, comes back the same way: for them the session is
+    over, СЕТЕВАЯ ИГРА (Network game) is in their main menu again, and they join the host as a newcomer.
+  - When a session is over for a game (everybody left, the link to the host is lost), the game frees its port
+    and its place on Steam: a new network game can be opened or joined from the same running game.
+  - Still four players at most. Refusals a newcomer may read: «в игре уже четыре игрока» (the game already
+    has four players), «игра уже начинается» (the game is already starting), another version of the mod,
+    another version of the game or other files of the game.
+  - The host of a game that is being played waits for newcomers both ways - on Steam and by address -
+    whichever way its first guests came (Steam must be running at the host's, the port must be free). In the
+    lab the newcomer came the same way as the first two.
+- **Anybody pauses.** Esc of any player pauses the fight for everybody; any player's Esc or Enter goes on
+  with it. The pause menu's second row — leave the fight — stays with the player who leads the menus (the one
+  who chose the fight in the main menu). Before 0.2.0 only that player could pause at all.
+- **A slow PC no longer slows a fight.** A new setting, «Пропуск кадров» (frame skipping), on by default
+  (`[video] frame_skip = 1`): when the PC cannot draw 60 pictures a second, a fight's frames are played
+  without their pictures, up to three in a row. The game keeps its real speed, and in a network game one slow
+  PC no longer slows everybody. It works in fights only: menus and a fight's opening are still slowed by a PC
+  that cannot draw them.
+- **A real 4 and 6.** The Russian release's font has Ч in the place of 4 and Б in the place of 6. The mod
+  gives the menu font a real 4 and 6: in the address on the network page, in the players' numbers, in a
+  fight's clock and scores, in the options. Words keep their Ч and Б. The rows of an open game's page are
+  numbered 1. 2. 3. 4. — they used to say I. II. III. IV.
+- Fixed: «ИГРЫ РАЗОШЛИСЬ» (the games have parted) was not shown when a guest's game was a frame or two ahead
+  of the host's (its fingerprint came before the host had its own). Now the divergence is noticed at the next
+  check.
+- Drawing and particles no longer take random numbers from the game's rules: what a PC draws, how wide its
+  frame is, or whether it draws a frame at all cannot part the games.
+- Wide menus: the story's results screen fills a wide frame — its black borders stand at the picture's edges.
+- The key `vsync` of the section `[video]` is gone: the mod read it and did nothing with it.
+- The log's line about the picture now tells of the frames without a picture too:
+
+  ```
+  video: 3600 pictures shown, 60.0 a second lately, 0 frames played without a picture; render targets set 14400 times, refused 0
+  ```
+
+Launcher 1.2.0:
+
+- On the tab ГРАФИКА (graphics), in the box КАРТИНКА (picture), a row «Пропуск кадров» (frame skipping): «Вкл»
+  (on) or «Выкл» (off). Nothing else changed in the launcher.
+
+What exactly was checked in the lab:
+
+- The story: two and three copies; a duel stage (won; the hero down and the partner wins; everybody down —
+  lost, then the rematch) and a team stage with a friend from the game's script (three players); the logs
+  were identical frame by frame. Not checked: every stage of every hero, a real game.
+- Coming into a running game: a third copy knocks during a fight of two (by address and through the stand-in
+  for Steam) and is in after the fight; a guest returns after its link was lost for good; the logs of the new
+  session were identical. Not checked on real Steam.
+- The pause: a guest pauses and goes on with the fight; the player who leads the menus leaves the fight.
+- Frame skipping: one copy of two needed 30 ms more for every picture. With the setting on both copies played
+  the fight at 60 frames a second, with it off both at 29.
 
 ## 0.1.1
 

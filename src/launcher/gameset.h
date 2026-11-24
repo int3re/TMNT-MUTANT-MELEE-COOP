@@ -10,7 +10,7 @@ namespace gset {
 
 enum Row {
   kMode, kResolution, kAspect, kMenus,                           // ГРАФИКА: the screen
-  kAntialiasing, kAnisotropy, kToon, kShadows, kParticles,       //          the picture
+  kAntialiasing, kAnisotropy, kToon, kShadows, kParticles, kFrameSkip,  // the picture
   kDelay, kLobby,                                                // СЕТЬ: the network game
   kMouse,                                                        //       the mouse
   kRows

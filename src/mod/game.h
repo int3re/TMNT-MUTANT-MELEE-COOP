@@ -181,7 +181,24 @@ constexpr uintptr_t kMainMenuUpdate = 0x0044A660;  // void __thiscall(mode)
 constexpr uintptr_t kPlayerSelectReset = 0x0044F770;  // void __thiscall(player select mode)
 constexpr uintptr_t kModePlayerSelect = 0x005B08C0, kModeAdventureSelect = 0x005B091C, kModeLibrary = 0x005B0940,
                     kModeOptions = 0x005B08D0;
-constexpr uintptr_t kPlayerObjects = 0x005AF100;  // player*[4]; +0x10B: the pad that leads
+// The fight (TtMeleeGameMode, Update 0x42F490). Esc of the pad that leads the menus (kPrimaryPad) pauses;
+// the pause menu (0x42F160: "go on" / "leave") is read from the same pad: stick up / down, Esc or Enter.
+constexpr uintptr_t kModeMeleeGame = 0x005B08F4;
+constexpr int kFightPaused = 0x35;       // uint8
+constexpr int kFightPauseCursor = 0x38;  // int: 0 = go on, 1 = leave the fight
+constexpr uintptr_t kPlayerObjects = 0x005AF100;  // player*[8]: the fighters' slots
+constexpr int kPlayerPad = 0x10B;                 // uint8: the pad that plays the slot (0xFF: none, the computer does)
+constexpr int kPlayerTeam = 0x2D4;                // int
+constexpr int kPlayerHealth = 0x488;              // int: health now
+constexpr int kPlayerAi = 0x2C8;                  // int: the computer's kind of player; -1 = a human
+// The story (tuning/adventure/<hero>.txt: stages of matches). A match's fighters are built from its
+// records by 0x455F00: slot 0 the hero (a human on the leading pad), then the enemies (team 1), then the
+// scripted friends (team 0), each friend and enemy led by the computer.
+constexpr uintptr_t kBuildMatch = 0x00455F00;      // void __thiscall(match)
+constexpr uintptr_t kRecordInit = 0x00452B40;      // record* __thiscall(record): a fighter's record as new
+constexpr uintptr_t kCharacterName = 0x0042C8F0;   // const char* __cdecl(int id): "leo", "don", "mike", "raph", ...
+constexpr uintptr_t kStory = 0x00673E30;              // the story's object: +0x28 / +0x2C the stages (stage*, begin and end)
+constexpr uintptr_t kStoryCharacters = 0x006753D0;    // int[8]: the character of every slot; [0] is the story's hero
 constexpr uintptr_t kPlayerCount = 0x005AF1CC;    // int
 // The scripts are read through the game's file functions (the archive).
 constexpr uintptr_t kFileOpen = 0x00401A30;      // handle __cdecl(const char* name, const char* mode)
@@ -201,6 +218,8 @@ constexpr uintptr_t kDraw2dEnd = 0x004093F0;     // void __cdecl()
 constexpr uintptr_t kDrawBox = 0x0042ECF0;       // void __cdecl(float xywh[4], uint32* colour): 0..1 units
 constexpr uintptr_t kDrawText = 0x0040AC30;      // void __cdecl(font, wchar_t*, float size, float xywh[4], int, brush, int shadow, int)
 constexpr uintptr_t kFont = 0x00672EC8;          // the menus' font
+constexpr uintptr_t kRasterLock = 0x00538990;    // uint8* __cdecl(raster, uint8 level, int mode): 1 write, 2 read
+constexpr uintptr_t kRasterUnlock = 0x005387A0;  // raster* __cdecl(raster): mip levels are made anew
 constexpr uintptr_t kBrushWhite = 0x005B1078;
 constexpr uintptr_t kRwRenderStateSet = 0x00536380;  // void __cdecl(int state, void* value); state 1 = the texture
 constexpr uintptr_t kBrushColors = 0x00501190;   // void __cdecl(brush, c*, c*, c*, c*)
@@ -229,6 +248,7 @@ constexpr uintptr_t kStreamPlay = 0x004DD840;    // void __cdecl(stream)
 // RenderWare's RpRandom is the game's generator (71 functions draw from it); the C library's rand()
 // only varies the pitch of sounds.
 constexpr uintptr_t kRpRandom = 0x00500D80;      // uint __cdecl()
+constexpr uintptr_t kPtxUpdate = 0x00481A50;     // void __thiscall(TtPtxSystem*): a particle system's frame
 constexpr uintptr_t kRpRandomSeed = 0x00500E10;  // void __cdecl(uint)
 constexpr uintptr_t kRwGlobals = 0x00682C84;     // RwGlobals* (RwEngineInstance)
 constexpr uintptr_t kRandomOffset = 0x00683224;  // int: offset of the plugin's state in RwGlobals

@@ -15,6 +15,7 @@
 #include "mod/menu.h"
 #include "mod/netplay.h"
 #include "mod/patch.h"
+#include "mod/sim.h"
 
 namespace video {
 namespace {
@@ -311,8 +312,9 @@ HRESULT WINAPI hkPresent(void* dev, const RECT* src, const RECT* dst, HWND wnd, 
     static DWORD mark = 0;
     DWORD t = GetTickCount();
     if (mark && t != mark)
-      LOGI("video: %u pictures shown, %.1f a second lately; render targets set %u times, refused %u", f,
-           1800 * 1000.0 / (t - mark), g_rt_calls, g_rt_failed);
+      LOGI("video: %u pictures shown, %.1f a second lately, %u frames played without a picture; render targets set %u times, "
+           "refused %u",
+           f, 1800 * 1000.0 / (t - mark), sim::pictures_skipped(), g_rt_calls, g_rt_failed);
     else
       LOGI("video: %u pictures shown", f);
     mark = t;
@@ -321,6 +323,7 @@ HRESULT WINAPI hkPresent(void* dev, const RECT* src, const RECT* dst, HWND wnd, 
     save_shot(dev, g_shot_frame);
     g_shot_frame = 0;
   }
+  if (g_cfg.lab_draw_cost_ms) Sleep(g_cfg.lab_draw_cost_ms);
   if (windowed() && g_copy && !dst) {
     HWND hwnd = wnd ? wnd : g_hwnd.load();
     if (hwnd && !IsIconic(hwnd))

@@ -9,7 +9,10 @@ namespace mmp {
 
 constexpr uint32_t kMagic = 0x454C454D;  // bytes 'M','E','L','E'
 // 1 (meleenet 0.1.0): the first network game.
-constexpr uint16_t kVersion = 1;
+// 2 (meleenet 0.2.0): every player's Esc pauses a fight; pictures and particles take no random numbers of the
+//    rules; the story is played together; a player who has left is marked in the pads; a game that is being
+//    played lets players in (Knock / Lobby / Go between the games of a running session).
+constexpr uint16_t kVersion = 2;
 constexpr uint16_t kDefaultPort = 47830;
 
 constexpr uint8_t kChannelControl = 0;  // reliable, ordered
@@ -120,7 +123,8 @@ struct Lobby {
   Header h;
   uint8_t players;   // in the lobby, the host included
   uint8_t you;       // the receiver's place
-  uint8_t reserved[2];
+  uint8_t playing;   // 1: the host's game is being played; the receiver comes in between two fights
+  uint8_t reserved;
   char names[kPlayers][32];
 };
 

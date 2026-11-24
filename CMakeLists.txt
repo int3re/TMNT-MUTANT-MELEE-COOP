@@ -87,6 +87,8 @@ add_library(meleenet MODULE
   src/mod/video.cpp
   src/mod/input.cpp
   src/mod/sim.cpp
+  src/mod/digits.cpp
+  src/mod/story.cpp
   src/mod/sound.cpp
   src/mod/notice.cpp
   src/mod/gametext.cpp

@@ -6,9 +6,9 @@
 </p>
 
 <p align="center">
-  <img alt="version 0.1.1" src="https://img.shields.io/badge/version-0.1.1-2E86E8">
-  <img alt="launcher 1.1.0" src="https://img.shields.io/badge/launcher-1.1.0-F28C1E">
-  <img alt="network protocol 1" src="https://img.shields.io/badge/network%20protocol-1-blue">
+  <img alt="version 0.2.0" src="https://img.shields.io/badge/version-0.2.0-2E86E8">
+  <img alt="launcher 1.2.0" src="https://img.shields.io/badge/launcher-1.2.0-F28C1E">
+  <img alt="network protocol 2" src="https://img.shields.io/badge/network%20protocol-2-blue">
   <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078d4">
   <img alt="2–4 players" src="https://img.shields.io/badge/players-2–4-4BCB3C">
   <img alt="Steam, LAN, IP" src="https://img.shields.io/badge/network-Steam%20·%20LAN%20·%20IP-1b2838">
@@ -32,7 +32,8 @@
 **meleenet** is a mod for the Russian release of *TMNT Mutant Melee*. In the game's РУКОПАШНЫЙ БОЙ (Melee) up
 to four players fight, but only at one computer. The mod gives the same over the network: every player has
 their own copy of the game and their own screen, and the network game starts from the game's own main menu —
-with its buttons and in its font.
+with its buttons and in its font. ИСТОРИЯ (Story), which the game makes for one player, is played together over
+the network: the other players fight on the hero's side.
 
 Along the way the mod brings a game of 2005 to today's monitors: a borderless window instead of the 640×480
 full screen, any resolution, a wide frame that both the fights and the menus fill, smoothed edges and sharp
@@ -129,11 +130,14 @@ In detail — on the **[launcher's page](docs/en/LAUNCHER.md)**. Without a windo
 | | In the original | With the mod |
 |---|---|---|
 | **A game of four** | four at one PC | the same over the network: Steam, a local network, IP — up to four PCs |
+| **ИСТОРИЯ (Story)** | for one player | together over the network: in every match the other players fight on the hero's side; some matches stay for the hero alone |
+| **Pause in a fight** | Esc of the player who leads the menus | in a network game — Esc of any player, the pause comes up for everybody |
 | **The window** | only an exclusive 640×480 full screen | a borderless window over the whole monitor or an ordinary window; Alt+Tab at once |
 | **Resolution** | 640×480 | the monitor's own or any of your choice |
 | **Wide screen** | a 4:3 frame | a frame of the monitor's shape (16:9, 16:10, 21:9): in fights the view is wider at the sides |
 | **Menus on a wide screen** | — | backgrounds, pipes and walls go to the screen's edges, the words stand on their plates |
 | **Quality of the picture** | no smoothing | smoothed edges up to 8x, texture filtering up to 16x |
+| **The digits 4 and 6** | the Russian release's font has the letters Ч and Б in their places | a real 4 and 6: in the address, in the players' numbers, in a fight's clock and scores, in the options |
 | **Mouse buttons** | not used | the left, the right, the middle and both side buttons can be given to attacks, like keys |
 | **Main menu** | ИСТОРИЯ (Story), РУКОПАШНЫЙ БОЙ (Melee), БИБЛИОТЕКА (Library), ПАРАМЕТРЫ (Options), ВЫХОД (Quit) | СЕТЕВАЯ ИГРА (Network game) is added as the third button |
 | **Loading screen** | the game crashed on it now and then | fixed |
@@ -156,8 +160,9 @@ same keys as in the other menus. The mod has no windows of its own over the game
   </tr>
 </table>
 
-The messages of a network game — that a player has left, that the connection is lost, that the games have parted
-— are written by the game itself, in its font, at the top of the frame.
+The messages of a network game — that a player has left, that the connection is lost, that the games have
+parted, that a new player waits for the end of the fight — are written by the game itself, in its font, at the
+top of the frame.
 
 ## Features
 
@@ -168,20 +173,40 @@ The messages of a network game — that a player has left, that the connection i
 - **up to four players at different PCs** in РУКОПАШНЫЙ БОЙ (Melee) — just as four at one computer. Only the
   presses travel over the network, no picture is sent: there is no video delay, the game runs frame for frame on
   every PC;
+- **ИСТОРИЯ (Story) together**: the player who chose it in the main menu leads it, and in every match the other
+  players fight on the hero's side;
 - **Steam or an address**: friends in Steam see each other's game in a list; without Steam a guest types the
   host's address (a local network, a forwarded port, Radmin VPN, Hamachi, ZeroTier);
 - **meeting inside the game**: the СЕТЕВАЯ ИГРА button in the main menu and a page made of the game's own buttons;
+- **coming into a game that is being played**: the host's game stays open while it is played; a new player
+  waits on the network page and comes in between two fights — a fight is not interrupted for it;
 - **the common progress** is the host's: for the time of the game the guests get the host's save, the mod never
   touches the players' own saves;
+- **the pause is anybody's**: Esc pauses the fight for everybody, any player's Esc or Enter goes on with it;
 - **the connection survives** lost packets and a long loading of a level;
 - **if a player has left** or the connection to them is lost for more than 15 seconds, the others go on without
-  them;
+  them; they can come back the way a new player comes in;
+- **a slow PC does not slow a fight for the others**: the frames of a fight it cannot draw in time are played
+  without their pictures;
 - **everyone's picture is their own**: the window, the resolution, the shape of the frame and the smoothing do
   not affect the course of the game.
 
-The game's ИСТОРИЯ (Story) is made for one player: over the network one plays it, the others watch.
-
 <br clear="right">
+
+#### The story together
+
+<p align="center">
+  <img src="docs/images/game-story.png" alt="A team match of the story in a network game of three players" width="820"><br>
+  <sub>A team match of the story in a game of three players: Leonardo is the hero, Raphael and Donatello are partners, Splinter is the friend the game's own script gives; against them, three Foot soldiers.</sub>
+</p>
+
+In the game itself ИСТОРИЯ (Story) is made for one player. In a network game the player who chose ИСТОРИЯ in the
+main menu leads it: chooses the hero and moves on the map, and in every match the other players fight beside
+the hero as partners. A partner plays a turtle by their player number: player 1 Leonardo, 2 Raphael, 3
+Donatello, 4 Michelangelo; a partner cannot choose a fighter yet. The training matches with the mecha turtle,
+the bomb match and the other mini-games, and a few more matches stay for the hero alone: the partners watch
+them. The rules, the full list of such matches and what has been checked are in the
+[network game guide](docs/en/NETPLAY.md#the-story-together).
 
 ### Screen and picture
 
@@ -190,6 +215,9 @@ The game's ИСТОРИЯ (Story) is made for one player: over the network one p
 - **menus that fill a wide frame**: the honeycomb, the pipes and the brick walls go to the screen's edges; if
   you wish — the game's own 4:3 with bars;
 - **smoothed edges** up to 8x and **sharp textures at an angle** up to 16x;
+- **a real 4 and 6** in the menu font: the Russian release has the letters Ч and Б in their places;
+- **frame skipping**: when the PC cannot draw 60 pictures a second, a fight's frames are played without their
+  pictures and the game keeps its real speed;
 - a rare crash of the game on the loading screen is fixed.
 
 <p align="center">
@@ -222,10 +250,17 @@ Playing together:
 | 1 | СЕТЕВАЯ ИГРА → **СОЗДАТЬ ИГРУ** (Create a game) | СЕТЕВАЯ ИГРА → **ИГРЫ ДРУЗЕЙ В STEAM** (Friends' games in Steam) → the host's game; or **ВОЙТИ ПО АДРЕСУ** (Join by address) |
 | 2 | waits until the guests' names appear in the list | wait |
 | 3 | **НАЧАТЬ ИГРУ** (Start the game) | every game closes and in a few seconds opens again — already in the common game |
-| 4 | chooses **РУКОПАШНЫЙ БОЙ** (Melee) in the main menu | on the heroes' screen everyone chooses their own |
+| 4 | in the main menu — **РУКОПАШНЫЙ БОЙ** (Melee) or **ИСТОРИЯ** (Story); any player may choose | in РУКОПАШНЫЙ БОЙ everyone chooses their own hero; in ИСТОРИЯ the hero is chosen by the player who opened it, the others fight beside the hero |
 
 Over Steam: Steam is running at everyone's PC, the players are friends. Without Steam the guests need a direct
-connection to the host over UDP, port `47830`. In detail — in the **[network game guide](docs/en/NETPLAY.md)**.
+connection to the host over UDP, port `47830`.
+
+A game that is already being played is joined the same way: **ИГРЫ ДРУЗЕЙ В STEAM** (the host's game is marked
+«ИДЕТ ИГРА», a game is going on) or **ВОЙТИ ПО АДРЕСУ**. The new player waits on the network page — it says
+ВОЙДЕТЕ ПОСЛЕ БОЯ (you come in after the fight); between two fights every game closes and opens again, now with
+the new player in. A player whose connection was lost comes back the same way.
+
+In detail — in the **[network game guide](docs/en/NETPLAY.md)**.
 
 ## Controls
 
@@ -242,6 +277,9 @@ The keys are the game's own. In a network game everyone plays at their own PC wi
 | Block | B | Left Shift |
 | Menus | arrows, Enter, Esc | arrows, Enter, Esc |
 | Pause in a fight | Esc | Esc |
+
+In a network game any player's Esc pauses the fight, and the pause comes up for everybody; any player's Esc or
+Enter goes on with the fight.
 
 A key or a mouse button is given to an action by the launcher: the УПРАВЛЕНИЕ (Controls) tab → press the
 action's cell → press a key or a mouse button. The full description is in the
@@ -263,7 +301,7 @@ action's cell → press a key or a mouse button. The full description is in the
 | [What is added and what is changed](docs/en/TOUR.md) | a tour in pictures: the game's menus, the network game, the launcher |
 | [Installing](docs/en/INSTALL.md) | what you need, installing, updating, removing, what goes where |
 | [The launcher](docs/en/LAUNCHER.md) | every screen and tab, updates, a proxy for GitHub, the command line |
-| [Network game](docs/en/NETPLAY.md) | how to meet over Steam or by address, the rules of a network game, lost connections |
+| [Network game](docs/en/NETPLAY.md) | how to meet over Steam or by address, the story together, coming into a running game, lost connections |
 | [Controls](docs/en/CONTROLS.md) | keys, mouse buttons, layouts, how to change them |
 | [Settings](docs/en/SETTINGS.md) | the launcher's rows and the whole `meleenet.ini` |
 | [If something is wrong](docs/en/TROUBLESHOOTING.md) | common questions and what to send in a bug report |
@@ -276,7 +314,7 @@ All the documentation is also **[in Russian](docs/README.md)**.
 
 ## Versions and compatibility
 
-The current version of the mod is **0.1.1**, of the launcher — **1.1.0**. The launcher shows the version of the
+The current version of the mod is **0.2.0**, of the launcher — **1.2.0**. The launcher shows the version of the
 mod in the game's folder.
 
 In a network game everyone must have a version of the mod with the same network protocol: the game must run the
@@ -284,7 +322,8 @@ same on every PC, so any change in its course changes the protocol too.
 
 | Versions of the mod | Protocol | Play together |
 |---|---|---|
-| 0.1.0 – 0.1.1 | 1 | yes |
+| 0.2.0 | 2 | with 0.2.0 only: it does not play with 0.1.x, every player has to update |
+| 0.1.0 – 0.1.1 | 1 | with each other — yes |
 
 ## State of the project
 
@@ -293,24 +332,34 @@ no window on the screen. What is checked and what is not:
 
 - **checked in the lab:** a network game of two, three and four copies by address and over a stand-in for
   Steam, with lost packets; the whole way through the menus (create a game → join → start → a fight); copies
-  with different shapes of the frame; version 0.1.1 against 0.1.0; the logs of all copies matched frame for
-  frame. The menus that fill the frame were pictured on 16:9, 16:10 and 21:9;
-- **checked by a real run, with no window on the screen:** updating from the real GitHub — a launcher of the
-  earlier version found this release itself, downloaded it, checked it, took its place and installed the mod
-  0.1.1 over 0.1.0;
-- **not checked yet:** a game between real Steam accounts; the real window in front — the keyboard, the mouse
-  buttons, typing an address; gamepads; a pause in a network game; long games; a guest leaving in the middle
-  of a fight.
+  with different shapes of the frame; the logs of all copies matched frame for frame. The menus that fill the
+  frame were pictured on 16:9, 16:10 and 21:9;
+- **checked in the lab in version 0.2.0:**
+  - the story together on two and three copies: a duel stage (won; the hero down and the partner wins;
+    everybody down — lost, then the rematch) and a team stage with a friend from the game's script (three
+    players); the logs matched frame for frame;
+  - coming into a running game: a third copy knocks during a fight of two (by address and through the stand-in
+    for Steam) and is in after the fight; a guest returns after its link was lost for good; the logs of the new
+    session matched;
+  - the pause: a guest pauses and goes on with the fight, the player who leads the menus leaves the fight;
+  - frame skipping: one copy of two needed 30 ms more for every picture — with the setting on both played the
+    fight at 60 frames a second, with it off both at 29;
+- **checked by a real run, with no window on the screen (on release 0.1.1):** updating from the real GitHub —
+  a launcher of the earlier version found the release itself, downloaded it, checked it, took its place and
+  installed the mod 0.1.1 over 0.1.0;
+- **not checked by a real game yet:** Steam on real accounts; the real window in front — the keyboard, the
+  mouse buttons, typing an address; gamepads; long sessions; every stage of the story.
 
 Known limits:
 
-- a network game starts with a restart: after НАЧАТЬ ИГРУ (Start the game) every game closes and opens anew;
-- there is no joining a game that is already running and no coming back after a lost connection;
-- in a network game a slow PC slows the game for everyone: the players share the game's steps;
-- ИСТОРИЯ (Story) over the network is for one playing person, as in the game itself;
-- the game's library stays a 4:3 page on black;
-- in the game's Russian font the digits 4 and 6 look like the letters «ч» and «б» — it shows in the address on
-  the network page;
+- a network game still starts by a restart of every game, and a new player comes in by such a restart between
+  two fights, not into a fight. It was tried without a restart: a game that has already played keeps things of
+  it (the order of its particle systems, the AI's queued messages), so two games with different pasts part; a
+  fresh start is what makes them the same;
+- frame skipping works in fights only: menus and a fight's opening are still slowed by a PC that cannot draw
+  them;
+- the story: some matches stay for the hero alone; the partners play the four turtles, without a choice;
+- the game's library stays a 4:3 page on black; on 21:9 the right ramp of the menus' wall is mirrored whole;
 - the mod is made for one release of the game; the words of the mod and of the launcher are in Russian.
 
 ## Building from source
@@ -341,8 +390,12 @@ network: no PC runs a frame until it has the other players' presses for it. The 
 so enemies, physics and items need not be sent. Once a second the games compare a fingerprint of their state.
 To make the game run the same, the mod gives it a clock of its own and watches everything that could part the
 copies: the stopwatches of fades, the loading of levels on a second thread, whether a hero's line is being
-spoken. A network game starts with a restart: two games that have just been started run the same from the first
-frame.
+spoken; drawing and particles take no random numbers from the game's rules. A network game starts with a
+restart: two games that have just been started run the same from the first frame. A new player comes in the same
+way: between two fights every game starts again, now with the new player in.
+
+In the story the mod adds the other players to every match as the hero's "friends" — the way the game itself
+adds the friends of its script — and hands their fighters to those players.
 
 The mod's menus are the game's own menus: the game's screens are described by scripts, and the mod hands the
 game's parser its own script of the main menu, made of the game's own buttons. The menus that fill the frame are

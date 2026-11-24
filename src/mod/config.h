@@ -27,8 +27,9 @@ struct Config {
   bool menu_bars = false;
   // Size of the window's client area in window mode; 0 = three quarters of the desktop's height.
   int window_w = 0, window_h = 0;
-  // vsync = 1 | 0.
-  bool vsync = true;
+  // frame_skip = 1: when the PC cannot draw 60 pictures a second, a fight's frames are played without their
+  // pictures (up to three in a row) and the game keeps its speed - in a session, everybody's.
+  bool frame_skip = true;
   // antialiasing = 0 | 2 | 4 | 8: smoothed edges (MSAA); anisotropy = 0 | 2 | 4 | 8 | 16: sharp textures at an angle.
   int antialiasing = 4;
   int anisotropy = 16;
@@ -62,6 +63,7 @@ struct Config {
   // [debug] - for the lab only; never set in a player's ini.
   int net_loss = 0;
   unsigned net_outage_at_ms = 0, net_outage_ms = 0;
+  bool net_outage_once = false;
   unsigned net_stall_at_ms = 0, net_stall_ms = 0;
   unsigned net_quit_ms = 0;
   int mock_slot = 1;
@@ -105,16 +107,30 @@ struct Config {
   // epoch = 1: when the main menu is up for the first time it is entered anew with the clock and the random
   // numbers reset (what a session's start does); the script's frames and the sim log count from there.
   bool lab_epoch = false;
+  // epoch_boot = 1: that epoch is the game's start-up played again (what a session's start does).
+  bool lab_epoch_boot = false;
   // notice = N: a test notice is shown from game frame N for ten seconds.
   unsigned lab_notice = 0;
   // page = 1: the run goes through the network page: autoquit_frame counts in the session's game only.
   bool lab_page = false;
+  // autoquit_players = N: ... and only in a session of at least N players (a session that lets a player in starts again).
+  int lab_autoquit_players = 0;
   // address = 1: the network page's address row starts as [net] connect, whatever it is (127.0.0.1 in the lab).
   bool lab_address = false;
   // keep_modes = 1: the modes are not put back at an epoch (to see what that is needed for).
   bool lab_keep_modes = false;
   // epoch_at = N: ... not before game frame N (the copy has a history of its own by then).
   unsigned lab_epoch_at = 0;
+  // desync_at = N: at game frame N this copy takes one random number more (its game parts from the others').
+  unsigned lab_desync_at = 0;
+  // story_open = 1: every stage of the story is open. ko_enemies / ko_hero / ko_partners = N: at game frame N
+  // those fighters of a story match lose all their health.
+  bool lab_story_open = false;
+  unsigned lab_ko_enemies = 0, lab_ko_hero = 0, lab_ko_partners = 0;
+  // draw_every = N: only every Nth game frame is drawn (the others are played without their picture).
+  unsigned lab_draw_every = 0;
+  // draw_cost = N: every picture takes N ms more (a slow video card).
+  unsigned lab_draw_cost_ms = 0;
   // mode_log = 1: every change of the game's mode goes to the log.
   bool mode_log = true;
 };

@@ -34,6 +34,7 @@ const struct {
   int protocol;
 } kProtocols[] = {
     {L"0.1.0", L"0.1.1", 1},
+    {L"0.2.0", L"0.2.0", 2},
 };
 
 std::wstring folder(int csidl) {

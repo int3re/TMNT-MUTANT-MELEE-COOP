@@ -7,6 +7,8 @@
 // has no past. So the players meet before the game's first frame (a guest takes the host's save), and
 // all play the same frames from the very first one - a start-up without the logos, straight to the menu.
 // The games get there from the network page of the running game (netlobby), which starts them again.
+// A player who comes while the session is being played (or comes back after a lost link) waits at the
+// host's door; between two fights the host gives the word and every game starts again, the newcomer in.
 #pragma once
 #include <cstdint>
 
@@ -46,5 +48,8 @@ int me();
 int players();
 // A player's name ("" for an empty place).
 const char* name(int player);
+// The session's players other than `lead` who are in the game at the frame being played: the same
+// answer on every PC at the same frame. Their numbers go to out[]; returns how many.
+int partners(int lead, int out[3]);
 
 }  // namespace netplay

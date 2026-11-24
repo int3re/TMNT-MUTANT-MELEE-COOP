@@ -113,10 +113,17 @@ pale: their settings are kept in `meleenet.ini`, which comes with the mod.
 </p>
 
 **ЭКРАН** (Screen) — the game's window, the resolution, the shape of the frame and the menus; **КАРТИНКА**
-(Picture) — smoothing, the texture filter, the heroes' outlines, shadows and particles. These are the mod's
-own settings: they are kept in `meleenet.ini` in the game's folder and take effect at the next start of the
-game. Every row is described in [Settings](SETTINGS.md). The size and the shape of the frame do not change
-how the game plays, so the players of a network game may have them different.
+(Picture) — smoothing, the texture filter, the heroes' outlines, shadows, particles and frame skipping. These
+are the mod's own settings: they are kept in `meleenet.ini` in the game's folder and take effect at the next
+start of the game. Every row is described in [Settings](SETTINGS.md). The size and the shape of the frame do
+not change how the game plays, so the players of a network game may have them different.
+
+**Пропуск кадров** (Frame skipping: «Вкл», on, or «Выкл», off; the last row of КАРТИНКА) came with launcher
+1.2.0 and mod 0.2.0; nothing else changed in this version of the launcher. With «Вкл», the default, the
+frames of a fight that the computer cannot draw in time are played without their pictures and the game is
+not slowed; in a network game one slow computer does not slow the fight for the others. It works in fights
+only. The row is pale when the mod in the game's folder is older than 0.2.0: that mod does not read the
+setting.
 
 ### СЕТЬ — the network game and the mouse
 

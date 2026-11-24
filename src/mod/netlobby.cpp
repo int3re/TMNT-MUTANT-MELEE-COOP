@@ -64,6 +64,7 @@ uint32_t g_since_ms = 0;  // Joining: the knock; Starting: the start
 bool g_is_host = false;
 mmp::Go g_go{};           // guest: the host's start
 bool g_relaunched = false;
+bool g_host_playing = false;  // joined: the host's game is being played already
 
 void copy_text(char* to, size_t n, const std::string& s) {
   memset(to, 0, n);
@@ -144,8 +145,14 @@ void to_menu(const std::string& error) {
   g_state = State::Menu;
 }
 
-// --- the game again, into the session ------------------------------------------------------
+void relaunch_now(const wchar_t* mode, const wchar_t* via, uint64_t peer, const std::string& join, int players);
+
 void relaunch(const wchar_t* mode, const wchar_t* via, uint64_t peer, const std::string& join, int players) {
+  relaunch_now(mode, via, peer, join, players);
+}
+
+// --- the game again, into the session ------------------------------------------------------
+void relaunch_now(const wchar_t* mode, const wchar_t* via, uint64_t peer, const std::string& join, int players) {
   if (g_relaunched) return;
   g_relaunched = true;
   // (the lobby's ports and Steam are this game's until it is gone; the new one waits for that)
@@ -323,6 +330,7 @@ void guest_events() {
         if (l.players < 2 || l.players > kMax || l.you < 1 || l.you >= l.players) continue;
         g_players = l.players;
         g_me = l.you;
+        g_host_playing = l.playing != 0;
         for (int k = 0; k < kMax; ++k) {
           l.names[k][sizeof(l.names[k]) - 1] = 0;
           g_names[k] = k < g_players ? l.names[k] : "";
@@ -351,6 +359,7 @@ void begin_join(ITransport* t, const PeerId& host) {
   g_peers[0].peer = host;
   g_error.clear();
   g_is_host = false;
+  g_host_playing = false;
   g_state = State::Joining;
   g_since_ms = net::now_ms();
   if (!t->Connect(host)) to_menu("Не удалось подключиться к хосту.");
@@ -362,6 +371,7 @@ void fill_view() {
   g_view.steam_note = g_steam_note;
   g_view.error = g_error;
   g_view.addresses = g_addresses;
+  g_view.playing = g_host_playing && (g_state == State::Joined || (g_state == State::Starting && !g_is_host));
   if (g_is_host && (g_state == State::Hosting || g_state == State::Starting)) {
     g_view.players = g_guests + 1;
     g_view.me = 0;
@@ -382,8 +392,8 @@ void fill_view() {
       Game g;
       g.lobby = f.lobby;
       g.host = f.host.empty() ? f.name : f.host;
-      g.ok = f.compatible && f.state != "ingame";
-      g.why = !f.compatible ? f.why_not : f.state == "ingame" ? "уже играет" : "";
+      g.ok = f.compatible;  // (a game that is being played lets a player in between two fights)
+      g.why = !f.compatible ? f.why_not : f.state == "ingame" ? "идёт игра" : "";
       g_view.games.push_back(g);
     }
 }
@@ -391,6 +401,10 @@ void fill_view() {
 }  // namespace
 
 void install(const Config& cfg) { g_cfg = cfg; }
+
+void start_again(const wchar_t* mode, const wchar_t* via, uint64_t peer, const std::string& join, int players) {
+  relaunch(mode, via, peer, join, players);
+}
 
 const View& view() { return g_view; }
 

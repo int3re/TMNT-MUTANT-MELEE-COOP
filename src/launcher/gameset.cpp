@@ -51,6 +51,7 @@ const Info kInfo[kRows] = {
     {L"Тени", "shadows", Kind::Pair, L"video", L"shadows", L"1", {{L"Живые", L"1"}, {L"Простые", L"0"}}},
     {L"Частицы", "particles", Kind::Choice, L"video", L"particles", L"100",
      {{L"Все", L"100"}, {L"Меньше", L"70"}, {L"Мало", L"40"}}},
+    {L"Пропуск кадров", "frameskip", Kind::Pair, L"video", L"frame_skip", L"1", {{L"Вкл", L"1"}, {L"Выкл", L"0"}}, L"0.2.0"},
     {L"Задержка ввода", "delay", Kind::Choice, L"net", L"delay", L"2",
      {{L"1 кадр", L"1"}, {L"2 кадра", L"2"}, {L"3 кадра", L"3"}, {L"4 кадра", L"4"}, {L"5 кадров", L"5"}, {L"6 кадров", L"6"}}},
     {L"Видят в Steam", "lobby", Kind::Pair, L"net", L"lobby", L"friends", {{L"Друзья", L"friends"}, {L"Все", L"public"}}},

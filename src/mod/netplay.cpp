@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "common/lobby_steam.h"
 #include "common/log.h"
 #include "common/net.h"
 #include "common/protocol.h"
@@ -22,6 +23,7 @@
 #include "mod/game.h"
 #include "mod/input.h"
 #include "mod/multi_transport.h"
+#include "mod/netlobby.h"
 #include "mod/notice.h"
 #include "mod/patch.h"
 #include "mod/sim.h"
@@ -62,11 +64,30 @@ uint32_t g_bundle = 0;          // guest: the last frame whose pads (of everybod
 uint32_t g_host_has = 0;        // guest: the newest frame of this PC's pads the host has confirmed
 uint32_t g_guest_has[kMax] = {}; // host: the newest bundle frame each guest has confirmed
 input::Pad g_held[kMax];        // the pads of the last frame played
+// A player who has left is marked in its pads from the frame the host let it go (a bit of the pad the
+// game never reads): every PC knows from the same frame on that the player is not there.
+constexpr uint16_t kGoneMark = input::bit(game::kDebugX);
 uint32_t g_started_ms = 0;
 
 std::map<uint32_t, uint32_t> g_hash_mine;
+std::map<uint32_t, uint32_t> g_hash_early[kMax];  // host: a guest's fingerprints of frames the host has not played yet
 bool g_desync = false;
 uint32_t g_waited_ms = 0, g_waits = 0;
+
+// A player who comes while the session is being played. The games of a session are the same because
+// they started together, so a player who comes later - or comes back after a lost link - waits at the
+// host's door. Between two fights the host gives the word, and every game, the newcomer's too, starts
+// itself again into a session of all of them.
+struct Waiting {
+  PeerId peer;
+  std::string name;
+};
+std::vector<Waiting> g_waiting;         // host
+uint32_t g_again_ms = 0;                // the word was given (host) or heard (guest) at this time; 0: not yet
+int g_again_players = 0;                // host: players of the session to come
+bool g_again_steam = false, g_again_enet = false;  // host: the ways its guests came
+mmp::Go g_again{};                      // guest: where the host's new game will be
+std::unique_ptr<lobby::IHost> g_lobby;  // host: the game stays among the friends' games on Steam while it is played
 
 // The link's keeper. The game's thread answers the network once a frame; a frame that loads a level
 // takes seconds, and so does a window being dragged. A second thread then answers in its place: it
@@ -151,18 +172,28 @@ void say_bye() {
 
 void end_session(const char* why) {
   if (g_phase == Phase::Off || g_phase == Phase::Ended) return;
+  if (g_again_ms) return;  // (the games are starting again: a link that goes now is no news)
   LOGW("net: the session is over: %s (frame %u; waited %u ms in %u waits; the keeper stood in %u times)", why, g_frame,
        g_waited_ms, g_waits, g_kept.load());
   g_keeper_on = false;
   if (strcmp(why, "this game is closing") != 0 && g_phase == Phase::Playing)
     notice::say(g_host ? L"СЕТЕВАЯ ИГРА ОКОНЧЕНА" : L"СВЯЗЬ С ХОСТОМ ПОТЕРЯНА\nДАЛЬШЕ ВЫ ИГРАЕТЕ ОДИН", 10);
   say_bye();
+  {
+    // (the port and the place on Steam are free again: this game can open a new game, or join one)
+    NetLock lock;
+    if (g_t) {
+      g_t->Shutdown();
+      g_t.reset();
+    }
+    g_lobby.reset();
+  }
   g_phase = Phase::Ended;
 }
 
 // A guest has left (host): the session goes on without it, its pad is empty from now on.
 void drop(int player, const char* why) {
-  if (g_gone[player]) return;
+  if (g_gone[player] || g_again_ms) return;
   g_gone[player] = true;
   LOGW("net: %s (player %d) has left: %s (frame %u)", g_names[player].c_str(), player + 1, why, g_frame);
   wchar_t text[96];
@@ -176,8 +207,15 @@ void drop(int player, const char* why) {
 // [debug] net_loss / net_outage: a bad link for the lab.
 bool lab_drops() {
   if (g_cfg.net_outage_ms) {
+    // (net_outage_once: only in the first session of a lab run - a mark is left next to the game)
+    static int done = -1;
+    const std::wstring mark = module_dir() + L"lab-outage.done";
+    if (done < 0) done = g_cfg.net_outage_once && GetFileAttributesW(mark.c_str()) != INVALID_FILE_ATTRIBUTES ? 1 : 0;
     uint32_t t = net::now_ms() - g_started_ms;
-    if (t >= g_cfg.net_outage_at_ms && t < g_cfg.net_outage_at_ms + g_cfg.net_outage_ms) return true;
+    if (!done && t >= g_cfg.net_outage_at_ms && t < g_cfg.net_outage_at_ms + g_cfg.net_outage_ms) {
+      if (g_cfg.net_outage_once) CloseHandle(CreateFileW(mark.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, 0, nullptr));
+      return true;
+    }
   }
   if (!g_cfg.net_loss) return false;
   static uint32_t seed = GetTickCount() | 1;
@@ -295,6 +333,18 @@ void desync(int player, uint32_t frame, uint32_t mine, uint32_t theirs) {
   notice::say(L"ИГРЫ РАЗОШЛИСЬ\nНАЧНИТЕ СЕТЕВУЮ ИГРУ ЗАНОВО", 15);
 }
 
+// Host: a guest's fingerprint of a frame against the host's own.
+void check_hash(int player, uint32_t frame, uint32_t theirs) {
+  auto it = g_hash_mine.find(frame);
+  if (it == g_hash_mine.end() || it->second == theirs || g_desync) return;
+  desync(player, frame, it->second, theirs);
+  auto ds = mmp::make<mmp::Desync>(mmp::Type::Desync);
+  ds.player = static_cast<uint8_t>(player);
+  ds.frame = frame;
+  for (int p = 1; p < g_players; ++p)
+    if (!g_gone[p]) send(g_peer[p], ds, Channel::Control);
+}
+
 void on_data(const Event& ev) {
   const uint8_t* d = ev.data.data();
   size_t n = ev.data.size();
@@ -355,14 +405,12 @@ void on_data(const Event& ev) {
       if (!g_host || n < sizeof(mmp::Hash)) return;
       mmp::Hash hp;
       memcpy(&hp, d, sizeof(hp));
-      auto it = g_hash_mine.find(hp.frame);
-      if (it != g_hash_mine.end() && it->second != hp.hash && !g_desync) {
-        desync(from, hp.frame, it->second, hp.hash);
-        auto ds = mmp::make<mmp::Desync>(mmp::Type::Desync);
-        ds.player = static_cast<uint8_t>(from);
-        ds.frame = hp.frame;
-        for (int p = 1; p < g_players; ++p)
-          if (!g_gone[p]) send(g_peer[p], ds, Channel::Control);
+      // (a guest may be a frame or two ahead of the host: its fingerprint then waits for the host's own)
+      if (g_hash_mine.count(hp.frame)) {
+        check_hash(from, hp.frame, hp.hash);
+      } else {
+        g_hash_early[from][hp.frame] = hp.hash;
+        if (g_hash_early[from].size() > 64) g_hash_early[from].erase(g_hash_early[from].begin());
       }
       break;
     }
@@ -377,6 +425,18 @@ void on_data(const Event& ev) {
       }
       break;
     }
+    case mmp::Type::Go: {
+      // The host's word: somebody has come; every game starts again into a session with them.
+      if (g_host || n < sizeof(mmp::Go) || g_again_ms) return;
+      memcpy(&g_again, d, sizeof(g_again));
+      mmp::Header ack;
+      ack.type = static_cast<uint8_t>(mmp::Type::GoAck);
+      send_to(g_peer[0], &ack, sizeof(ack), Channel::Control);
+      g_again_ms = net::now_ms();
+  if (!g_again_ms) g_again_ms = 1;
+      LOGI("net: the host lets another player in: this game starts again in a moment");
+      break;
+    }
     case mmp::Type::Bye:
       if (g_host)
         drop(from, "left");
@@ -388,6 +448,161 @@ void on_data(const Event& ev) {
   }
 }
 
+// --- the host's door ---------------------------------------------------------------------------------
+int present() {
+  int n = 0;
+  for (int p = 0; p < g_players; ++p) n += g_gone[p] ? 0 : 1;
+  return n;
+}
+
+// Everybody at the door is told who plays and who waits.
+void tell_waiting() {
+  for (size_t i = 0; i < g_waiting.size(); ++i) {
+    auto l = mmp::make<mmp::Lobby>(mmp::Type::Lobby);
+    int n = 0;
+    for (int p = 0; p < g_players; ++p)
+      if (!g_gone[p]) copy_name(l.names[n++], sizeof(l.names[0]), g_names[p]);
+    int you = n + static_cast<int>(i);
+    for (const Waiting& w : g_waiting)
+      if (n < kMax) copy_name(l.names[n++], sizeof(l.names[0]), w.name);
+    l.players = static_cast<uint8_t>(n);
+    l.you = static_cast<uint8_t>(you);
+    l.playing = 1;
+    send(g_waiting[i].peer, l, Channel::Control);
+  }
+}
+
+void refuse(const PeerId& peer, const char* why, uint16_t version) {
+  auto r = mmp::make<mmp::Reject>(mmp::Type::Reject);
+  r.h.version = version;  // (in the asker's own version: it must be able to read why)
+  copy_name(r.reason, sizeof(r.reason), why);
+  send(peer, r, Channel::Control);
+}
+
+bool between_fights() {
+  static const char* const ok[] = {"TtGameStartMode",       "TtPlayerSelectMode",    "TtLevelSelectMode",
+                                   "TtMeleeOptionsMode",    "TtAdventureSelectMode", "TtAdventureGameSelectMode"};
+  const char* mode = sim::mode_name();
+  for (const char* name : ok)
+    if (strcmp(mode, name) == 0) return true;
+  return false;
+}
+
+// Host: a message from somebody who is not in the session.
+void on_stranger(const Event& ev) {
+  auto it = g_waiting.begin();
+  while (it != g_waiting.end() && it->peer != ev.peer) ++it;
+  bool known = it != g_waiting.end();
+  if (ev.type == EventType::Disconnected) {
+    if (known && !g_again_ms) {
+      LOGI("net: %s no longer waits at the door (%s)", it->name.c_str(), ev.reason.c_str());
+      g_waiting.erase(it);
+      tell_waiting();
+    }
+    return;
+  }
+  if (ev.type != EventType::Data || ev.data.size() < sizeof(mmp::Header)) return;
+  mmp::Header h;
+  memcpy(&h, ev.data.data(), sizeof(h));
+  if (h.magic != mmp::kMagic) return;
+  auto type = static_cast<mmp::Type>(h.type);
+  if (type == mmp::Type::Bye) {
+    if (known && !g_again_ms) {
+      LOGI("net: %s no longer waits at the door", it->name.c_str());
+      g_waiting.erase(it);
+      tell_waiting();
+    }
+    return;
+  }
+  if (type != mmp::Type::Knock) return;
+  if (h.version != mmp::kVersion) {
+    LOGW("net: a player with another version of meleenet knocked (protocol %u, here %u)", h.version, mmp::kVersion);
+    refuse(ev.peer, "у хоста другая версия мода meleenet", h.version);
+    return;
+  }
+  if (ev.data.size() < sizeof(mmp::Hello)) return;
+  mmp::Hello k;
+  memcpy(&k, ev.data.data(), sizeof(k));
+  k.name[sizeof(k.name) - 1] = 0;
+  k.mod_version[sizeof(k.mod_version) - 1] = 0;
+  const char* why = memcmp(k.exe_hash, g_exe_hash, 8) != 0     ? "у хоста другая версия игры (ztmnt.exe)"
+                    : memcmp(k.data_hash, g_data_hash, 8) != 0 ? "у хоста другие файлы игры (archive.arc)"
+                    : g_again_ms                               ? "игра уже начинается"
+                    : !known && present() + static_cast<int>(g_waiting.size()) >= kMax ? "в игре уже четыре игрока"
+                                                                                       : nullptr;
+  if (why) {
+    LOGW("net: %s is not let in: %s", k.name, why);
+    refuse(ev.peer, why, mmp::kVersion);
+    return;
+  }
+  if (!known) {
+    g_waiting.push_back(Waiting{ev.peer, k.name});
+    LOGI("net: %s waits at the door (meleenet %s, %s): in between two fights", k.name, k.mod_version,
+         g_t->Describe(ev.peer).c_str());
+    if (!between_fights()) notice::say(L"НОВЫЙ ИГРОК ЖДЕТ: ОН ВОЙДЕТ ПОСЛЕ БОЯ", 8);
+  } else {
+    it->name = k.name;
+  }
+  tell_waiting();
+}
+
+// Host: the word. Every game of the session and every game at the door starts itself again.
+void give_the_word() {
+  g_again_players = present() + static_cast<int>(g_waiting.size());
+  g_again_steam = g_again_enet = false;
+  auto go = [](const PeerId& peer) {
+    auto g = mmp::make<mmp::Go>(mmp::Type::Go);
+    bool over_steam = peer.kind == transport::Kind::Steam;
+    (over_steam ? g_again_steam : g_again_enet) = true;
+    g.via = over_steam ? 2 : 1;
+    g.players = static_cast<uint8_t>(g_again_players);
+    g.port = static_cast<uint16_t>(g_cfg.net_port);
+    g.steam_id = steam::ready() ? steam::my_id() : 0;
+    send(peer, g, Channel::Control);
+  };
+  for (int p = 1; p < g_players; ++p)
+    if (!g_gone[p]) go(g_peer[p]);
+  for (const Waiting& w : g_waiting) go(w.peer);
+  g_again_ms = net::now_ms();
+  if (!g_again_ms) g_again_ms = 1;
+  LOGI("net: %u player(s) at the door: every game starts again into a session of %d", (unsigned)g_waiting.size(),
+       g_again_players);
+}
+
+// The word was given a moment ago (the answers have left): this game starts itself again.
+bool again_due() { return g_again_ms && net::now_ms() - g_again_ms >= (g_host ? 1500u : 400u); }
+
+void start_again() {
+  bool host = g_host;
+  std::string join;
+  uint64_t steam_id = 0;
+  const wchar_t* via = L"enet";
+  if (host) {
+    via = g_again_steam && g_again_enet ? L"both" : g_again_steam ? L"steam" : L"enet";
+  } else if (g_again.via == 2) {
+    via = L"steam";
+    steam_id = g_again.steam_id ? g_again.steam_id : g_peer[0].id;
+  } else {
+    in_addr ia;
+    ia.s_addr = g_peer[0].enet_ip();
+    join = std::string(inet_ntoa(ia)) + ":" + std::to_string(g_again.port ? g_again.port : g_peer[0].enet_port());
+  }
+  int players = host ? g_again_players : g_again.players;
+  LOGI("net: this game starts again into the new session (%d players)", players);
+  g_keeper_on = false;
+  {
+    NetLock lock;
+    if (g_t) {
+      g_t->Poll(0);
+      g_t->Shutdown();
+      g_t.reset();
+    }
+    g_lobby.reset();
+  }
+  g_phase = Phase::Ended;
+  netlobby::start_again(host ? L"host" : L"join", via, steam_id, join, players);
+}
+
 void pump_net(uint32_t wait_ms) {
   if (!g_t) return;
   g_pumped_ms = net::now_ms();
@@ -397,8 +612,10 @@ void pump_net(uint32_t wait_ms) {
     int n;
     {
       NetLock lock;
+      if (!g_t) break;  // (the session ended while its messages were being read)
       if (first) {
         if (steam::ready()) steam::pump();
+        if (g_lobby) g_lobby->Tick(net::now_ms());
         g_t->Poll(wait_ms);
       }
       first = false;
@@ -407,7 +624,10 @@ void pump_net(uint32_t wait_ms) {
     if (n <= 0) break;
     for (int i = 0; i < n; ++i) {
       int p = player_of(ev[i].peer);
-      if (p < 0) continue;
+      if (p < 0) {
+        if (g_host && g_phase == Phase::Playing) on_stranger(ev[i]);
+        continue;
+      }
       if (ev[i].type == EventType::Data) {
         on_data(ev[i]);
       } else if (ev[i].type == EventType::Disconnected) {
@@ -455,8 +675,10 @@ bool meet_host() {
   uint16_t port = static_cast<uint16_t>(g_cfg.net_port);
   const std::string& via = g_cfg.net_via;
   const std::string& tr = g_cfg.net_transport;
-  bool want_steam = via.empty() ? (tr == "steam" || tr == "mock" || tr == "auto") : (via == "steam" || via == "both");
-  bool want_enet = via.empty() ? (tr == "enet" || tr == "auto") : (via == "enet" || via == "both");
+  // (a game started again from the network page listens both ways whichever way its first guests came:
+  // a player who comes later may come the other way)
+  bool want_steam = via.empty() ? (tr == "steam" || tr == "mock" || tr == "auto") : tr != "enet";
+  bool want_enet = via.empty() ? (tr == "enet" || tr == "auto") : (tr != "steam" && tr != "mock");
   int want = g_cfg.net_players < 2 ? 2 : g_cfg.net_players > kMax ? kMax : g_cfg.net_players;
   std::unique_ptr<transport::ITransport> ts, te;
   if (want_steam) {
@@ -687,9 +909,31 @@ bool meet_guest() {
   return false;
 }
 
+// A fight's pause. The game reads the pause key and the pause menu from one pad only: the pad that
+// leads the menus (the player who chose the fight in the main menu). In a session every player's Esc
+// pauses the fight, and every player's Esc or Enter goes on with it; the pause menu's other row
+// ("leave the fight") stays the leading player's.
+bool here(int player) { return player >= 0 && player < g_players && !(g_held[player].buttons & kGoneMark); }
+
+void share_pause() {
+  void* mode = *reinterpret_cast<void**>(game::kMode);
+  if (!mode || mode != *reinterpret_cast<void**>(game::kModeMeleeGame)) return;
+  int lead = *reinterpret_cast<const int*>(game::kPrimaryPad);
+  if (lead < 0 || lead >= g_players) return;
+  auto m = reinterpret_cast<const uint8_t*>(mode);
+  bool paused = m[game::kFightPaused] != 0;
+  if (paused && *reinterpret_cast<const int*>(m + game::kFightPauseCursor) != 0) return;
+  uint16_t take = input::bit(game::kEscape) | (paused ? input::bit(game::kEnter) : 0);
+  uint16_t keys = 0;
+  for (int p = 0; p < g_players; ++p)
+    if (p != lead && here(p)) keys |= g_held[p].buttons & take;
+  g_held[lead].buttons |= keys;
+}
+
 void write_pads(uint32_t frame) {
+  for (int p = 0; p < kMax; ++p) g_held[p] = p < g_players ? get_pad(p, frame) : input::Pad{};
+  share_pause();
   for (int p = 0; p < kMax; ++p) {
-    g_held[p] = p < g_players ? get_pad(p, frame) : input::Pad{};
     input::set_connected(p, p < g_players);
     input::write(p, g_held[p]);
   }
@@ -703,6 +947,14 @@ void leave(const char* why) { end_session(why); }
 int me() { return g_phase == Phase::Playing || g_phase == Phase::Ready || g_phase == Phase::Ended ? g_me : 0; }
 int players() { return g_phase == Phase::Off || g_phase == Phase::Meeting ? 1 : g_players; }
 const char* name(int player) { return player >= 0 && player < kMax ? g_names[player].c_str() : ""; }
+
+int partners(int lead, int out[kMax - 1]) {
+  if (g_phase != Phase::Playing) return 0;
+  int n = 0;
+  for (int p = 0; p < g_players; ++p)
+    if (p != lead && here(p)) out[n++] = p;
+  return n;
+}
 
 void meet() {
   if (g_phase != Phase::Meeting) return;
@@ -730,6 +982,11 @@ void meet() {
   for (int p = 0; p < kMax; ++p) g_last_rx[p] = now;
   g_pumped_ms = now;
   g_phase = Phase::Ready;
+  if (g_host && steam::ready()) {
+    // (friends go on seeing the game on Steam while it is played: they can come in between two fights)
+    g_lobby = lobby::make_host(g_cfg, to_hex(g_exe_hash, 8));
+    if (g_lobby) g_lobby->SetInGame(true);
+  }
   g_keeper_on = true;
   if (HANDLE t = CreateThread(nullptr, 0, keeper, nullptr, 0, nullptr)) CloseHandle(t);
 }
@@ -749,6 +1006,7 @@ bool frame(uint32_t frame) {
       LOGI("net: playing from frame %u as player %d of %d", frame, g_me + 1, g_players);
     }
   }
+  if (g_phase == Phase::Playing && again_due()) start_again();
   if (g_phase == Phase::Ended && g_session_game) {
     // The session is over; this PC's player goes on with the pad it had.
     input::Pad mine = input::read_local(frame);
@@ -789,7 +1047,11 @@ bool frame(uint32_t frame) {
   g_newest[g_me] = frame + g_delay;
   if (g_host) {
     for (int p = 1; p < g_players; ++p)
-      if (g_gone[p]) set_pad(p, frame + g_delay, input::Pad{});
+      if (g_gone[p]) {
+        input::Pad gone;
+        gone.buttons = kGoneMark;
+        set_pad(p, frame + g_delay, gone);
+      }
     send_bundles();
   } else {
     send_inputs();
@@ -800,6 +1062,13 @@ bool frame(uint32_t frame) {
     if (g_host) {
       g_hash_mine[frame] = h;
       if (g_hash_mine.size() > 64) g_hash_mine.erase(g_hash_mine.begin());
+      for (int p = 1; p < g_players; ++p) {
+        auto early = g_hash_early[p].find(frame);
+        if (early == g_hash_early[p].end()) continue;
+        uint32_t theirs = early->second;
+        g_hash_early[p].erase(early);
+        if (!g_gone[p]) check_hash(p, frame, theirs);
+      }
     } else {
       auto hp = mmp::make<mmp::Hash>(mmp::Type::Hash);
       hp.frame = frame;
@@ -817,6 +1086,10 @@ bool frame(uint32_t frame) {
     waited = true;
     pump_net(1);
     uint32_t now = net::now_ms();
+    if (again_due()) {
+      start_again();
+      break;
+    }
     if (now - resent >= 8) {
       if (g_host)
         send_bundles();
@@ -856,6 +1129,7 @@ bool frame(uint32_t frame) {
     return true;
   }
   write_pads(frame);
+  if (g_host && !g_again_ms && !g_waiting.empty() && between_fights()) give_the_word();
   return true;
 }
 

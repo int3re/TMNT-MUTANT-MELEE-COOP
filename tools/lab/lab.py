@@ -81,7 +81,7 @@ def install(copy, ini_text, script=None, keep_save=False):
     if script is not None:
         with open(os.path.join(copy, "lab-script.txt"), "w", encoding="utf-8") as fh:
             fh.write("\n".join(script) + "\n")
-    for f in ("meleenet.log", "meleenet-sim.log", "meleenet-rng.log") + (() if keep_save else ("tmnt.sv",)):
+    for f in ("meleenet.log", "meleenet-sim.log", "meleenet-rng.log", "lab-outage.done") + (() if keep_save else ("tmnt.sv",)):
         p = os.path.join(copy, f)
         if os.path.exists(p):
             os.remove(p)

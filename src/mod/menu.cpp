@@ -7,6 +7,7 @@
 
 #include "common/log.h"
 #include "common/version.h"
+#include "mod/digits.h"
 #include "mod/game.h"
 #include "mod/gametext.h"
 #include "mod/netlobby.h"
@@ -243,9 +244,11 @@ uint64_t g_shown_games[4] = {};
 
 std::wstring slot_text(const netlobby::View& v, int i) {
   // (Roman numbers: in the Russian release's font the digits 4 and 6 are letters)
-  static const wchar_t* const num[4] = {L"I. ", L"II. ", L"III. ", L"IV. "};
-  if (i < v.players) return say(std::wstring(num[i])) + say(v.names[i]);
-  return say(std::wstring(num[i])) + T(L"СВОБОДНО", L"FREE");
+  static const wchar_t* const roman[4] = {L"I. ", L"II. ", L"III. ", L"IV. "};
+  static const wchar_t* const arabic[4] = {L"1. ", L"2. ", L"3. ", L"4. "};
+  const wchar_t* num = digits::ready() || !gametext::russian() ? arabic[i] : roman[i];
+  if (i < v.players) return say(std::wstring(num)) + say(v.names[i]);
+  return say(std::wstring(num)) + T(L"СВОБОДНО", L"FREE");
 }
 
 void fill_rows() {
@@ -256,7 +259,7 @@ void fill_rows() {
     case Page::Main:
       g_rows[0].text = gametext::game_string(game::kStrStory);
       g_rows[1].text = gametext::game_string(game::kStrMelee);
-      if (netplay::session_game()) {
+      if (netplay::active()) {
         wchar_t t[64];
         swprintf(t, 64, gametext::russian() ? L"В СЕТИ: ИГРОКОВ %d" : L"ONLINE: %d PLAYERS", netplay::players());
         g_rows[2].text = say(std::wstring(t));
@@ -289,7 +292,7 @@ void fill_rows() {
       int n = 0;
       for (const netlobby::Game& g : v.games) {
         if (n >= 4) break;
-        g_rows[n].text = say(g.host) + (g.ok ? L"" : L" - " + say(g.why));
+        g_rows[n].text = say(g.host) + (g.why.empty() ? L"" : L" - " + say(g.why));
         g_rows[n].on = g.ok;
         g_shown_games[n] = g.lobby;
         ++n;
@@ -319,8 +322,9 @@ void fill_rows() {
         g_rows[4].text = v.players >= 2 ? T(L"НАЧАТЬ ИГРУ", L"START THE GAME") : T(L"ЖДЕМ ИГРОКОВ", L"WAITING FOR PLAYERS");
         g_rows[4].on = v.players >= 2;
       } else {
-        g_rows[4].text = T(L"ЖДЕМ ХОСТА", L"WAITING FOR THE HOST");
+        g_rows[4].text = v.playing ? T(L"ВОЙДЕТЕ ПОСЛЕ БОЯ", L"IN AFTER THE FIGHT") : T(L"ЖДЕМ ХОСТА", L"WAITING FOR THE HOST");
         g_rows[4].on = false;
+        if (v.playing) g_status = T(L"У ХОСТА ИДЕТ ИГРА: МЕЖДУ БОЯМИ ОНА НАЧНЕТСЯ ЗАНОВО, УЖЕ С ВАМИ", L"THE HOST IS PLAYING: BETWEEN TWO FIGHTS THE GAME STARTS AGAIN WITH YOU IN");
       }
       g_rows[5].text = host ? T(L"ЗАКРЫТЬ ИГРУ", L"CLOSE THE GAME") : T(L"ВЫЙТИ", L"LEAVE");
       if (host && !v.addresses.empty())
@@ -563,6 +567,7 @@ Void_t oLoadLanguage = nullptr;
 void __cdecl hkLoadLanguage() {
   oLoadLanguage();
   gametext::init();
+  digits::on_fonts_loaded();
 }
 
 std::string clipboard_text() {

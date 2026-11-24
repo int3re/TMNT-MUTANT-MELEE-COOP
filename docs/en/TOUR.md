@@ -37,10 +37,19 @@ draws no windows over the game: everything is made of the game's own buttons and
 - The first page: **СОЗДАТЬ ИГРУ** (Open a game), **ИГРЫ ДРУЗЕЙ В STEAM** (Friends' games on Steam),
   **ВОЙТИ ПО АДРЕСУ** (Join by address), **АДРЕС: …** (Address; the host's address is typed on the
   keyboard), a row that says whether Steam is up, and **НАЗАД** (Back).
-- The page of an open game: four places, **I.** – **IV.**, with the players' names or the word СВОБОДНО
+- The page of an open game: four places, **1.** – **4.**, with the players' names or the word СВОБОДНО
   (free); under them the host has **НАЧАТЬ ИГРУ** (Start the game) and **ЗАКРЫТЬ ИГРУ** (Close the game), a
   guest has **ЖДЕМ ХОСТА** (Waiting for the host) and **ВЫЙТИ** (Leave). At the bottom of the screen the
   host sees the address the guests can type.
+
+The digits in an address and in the places' numbers are real ones. The Russian release's font has the
+letters Ч and Б in the places of 4 and 6; the mod gives the menu font a real 4 and 6 — they show in a
+fight's clock and scores and in the options too. Words keep their Ч and Б.
+
+**A game that is already being played can be joined too.** Among friends' games on Steam it is marked «ИДЕТ
+ИГРА» (a game is going on). The new player waits on the page of the game — it says **ВОЙДЕТЕ ПОСЛЕ БОЯ** (you
+come in after the fight) — and between two fights every game starts again, now with the new player in. A
+player whose link was lost comes back the same way.
 
 More: [Network play](NETPLAY.md).
 
@@ -58,7 +67,20 @@ network each computer is one of the four players, and each player picks their ow
 </p>
 
 A fight of four players. Nothing of the picture is sent over the network: each game plays the fight itself,
-and only the players' presses travel.
+and only the players' presses travel. Any player's Esc pauses the fight — for everybody.
+
+### The story together
+
+<p align="center">
+  <img src="../images/game-story.png" alt="A team match of the story in a network game of three players" width="820">
+</p>
+
+A team match of the story in a game of three players: Leonardo is the hero, Raphael and Donatello are
+partners, Splinter is the friend the game's own script gives; against them, three Foot soldiers. In the game
+itself ИСТОРИЯ (Story) is made for one player. Over the network the player who chose it in the main menu
+leads it, and in every match the other players fight on the hero's side — each as a turtle by their player
+number. A few matches stay for the hero alone: the training with the mecha turtle, the mini-games, the
+matches where an enemy comes back as another one. More: [The story together](NETPLAY.md#the-story-together).
 
 ### Wide screen: fights and menus
 
@@ -85,7 +107,8 @@ the original 4:3.
 - Instead of the exclusive 640×480 full screen: a window without a frame over the whole monitor, or an
   ordinary window, at any resolution. Alt+Tab works at once.
 - Smoothed edges (MSAA) up to 8x and anisotropic texture filtering up to 16x.
-- The game runs at exactly 60 frames a second.
+- The game runs at exactly 60 frames a second. If the computer cannot draw that many, a fight's frames are
+  played without their pictures and the game is not slowed.
 - Buttons of the mouse can be bound to actions like keys.
 - A rare crash of the game on the loading screen is fixed.
 

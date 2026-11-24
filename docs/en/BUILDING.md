@@ -10,7 +10,7 @@
 - **CMake 3.20** or newer (the one that comes with Visual Studio will do).
 - **Python 3** — only for the tools. The release's manifest and the lab need nothing but the standard
   library; `tools/re/mmre.py` needs the package `capstone`, `tools/launcher_fonts.py` needs `fontTools` and
-  `brotli`, `tools/launcher_icon.py` needs `Pillow`.
+  `brotli`, `tools/launcher_icon.py` needs `Pillow`, `tools/glyph_four.py` needs `Pillow` and `numpy`.
 
 Everything is built for **Win32**: `ztmnt.exe` is a 32-bit process, and so is whatever goes into it.
 CMake stops with an error if it is configured for another platform. After the build
@@ -35,6 +35,9 @@ The launcher's fonts and icon are in the repository too (`src/launcher/assets`; 
 description lie beside them). The fonts are made by `tools/launcher_fonts.py`, the icon is drawn by
 `tools/launcher_icon.py`. Without the file of the headings' font, `DelaGothicOne-Regular.ttf`, the build
 still goes through and the launcher draws its headings in a system font.
+
+The digit 4 for the game's own menu font, `src/mod/glyph4.h`, is in the repository too. It is drawn by
+`tools/glyph_four.py`; the build does not need the script, it is needed only to draw the glyph anew.
 
 ## Build
 
@@ -112,7 +115,7 @@ powershell -ExecutionPolicy Bypass -File tools/build.ps1 -Configure -Target mele
 | `dist` | what goes to a player as it is: `meleenet.ini`, the short description, `release.json` |
 | `docs` | this documentation and its pictures |
 | `re` | `notes.md` — the notes on taking `ztmnt.exe` apart (in Russian): the main loop, time and random numbers, input, the screen, the network, the game's interface |
-| `tools` | the one-command build, the release's manifest, the launcher's fonts and icon, the lab (`lab`), the tools for taking the game apart (`re`) |
+| `tools` | the one-command build, the release's manifest, the launcher's fonts and icon, the glyph of the digit 4 for the game's font, the lab (`lab`), the tools for taking the game apart (`re`) |
 | `third_party/minhook` | MinHook |
 
 ## Versions
@@ -169,6 +172,7 @@ game's files in them are hard links, and a copy has of its own only the settings
 | `diverge.py` | after `run_twice.py`: where the copies parted and, if the run had `rng_trace`, the first random number that differs, with the addresses of those who drew it |
 | `run_net.py <frames> [--players N] [--p1 "<script>"] [--p2 …] [--via enet\|mock]` | a network game of two to four copies on one computer, by address or through the stand-in for Steam; each copy plays its own script as its own player; the logs of all copies are compared frame by frame |
 | `run_page.py <frames> [--players N] [--via addr\|mock]` | the whole way through the page СЕТЕВАЯ ИГРА (network game): the copies start as ordinary games, walk the menu, one opens a game, the others join, the host starts — and each game starts itself again, now in the network game |
+| `run_door.py <frames> [--via addr\|mock]` | a player comes into a session that is being played: copies 1 and 2 go through the network page into a session and start a fight; then copy 3 is started, walks its own menu and knocks at the host. It waits at the door until the first two leave the fight, and then all three games start themselves again into a session of three; `<frames>` is how many frames that last session plays, and its frame logs must be the same |
 
 For example, one copy: 1500 frames, five presses of Enter, the picture of frame 1300 on a sheet:
 
@@ -196,6 +200,25 @@ lossy and broken network, a stalled frame, a trace of the random numbers, pictur
 `key=value` on the command line goes there too. In `run_one.py` and `run_net.py` a key with a section's
 name goes into that section: `net.delay=3` into `[net]`, `video.mode=window` into `[video]`; in
 `run_net.py`, `p2:net_loss=20` goes to the second copy only.
+
+The switches that came with version 0.2.0:
+
+| `[debug]` key | What it does |
+|---|---|
+| `draw_every = N` | only every Nth game frame is drawn, the others are played without their picture |
+| `draw_cost = N` | every picture takes N ms more: a slow video card |
+| `desync_at = N` | at game frame N this copy takes one random number more: its game parts from the others' |
+| `story_open = 1` | every stage of the story is open |
+| `ko_enemies = N`, `ko_hero = N`, `ko_partners = N` | at game frame N those fighters of a story match — the enemies, the hero, the partners — lose all their health |
+| `epoch_boot = 1` | with `epoch = 1`: the whole start-up of the game is played again, not only the entry into the main menu — as a session's start does |
+| `autoquit_players = N` | with `page = 1`: `autoquit_frame` counts only in a session of at least N players (a session that lets a player in starts again) |
+| `net_outage_once = 1` | the broken link of `net_outage` happens only in the first session of a run |
+
+For example, a slow second copy in a network game of two:
+
+```bash
+python tools/lab/run_net.py 3000 --p1 "<script>" --p2 "<script>" "p2:draw_cost=30"
+```
 
 **An earlier version against the new one.** In `run_net.py`, `pN:asi=<file>` gives copy N another build of
 `meleenet.asi`:

@@ -18,10 +18,14 @@ void install(const Config& cfg);
 
 // Game frames so far.
 uint32_t frame();
+// Game frames played without their picture so far (the PC was behind the game's clock).
+unsigned pictures_skipped();
 
 // An epoch: the main menu's mode is entered anew, and right before it the clock and the random numbers
 // are reset - the moment from which the games of a session are the same. `then` is called at that moment.
-bool request_epoch(uint32_t seed, void (*then)() = nullptr);
+// `boot`: the epoch is the game's very first mode instead - the whole start-up is played again (the save
+// is read anew), as in a game that has just been started.
+bool request_epoch(uint32_t seed, void (*then)() = nullptr, bool boot = false);
 bool epoch_pending();
 uint32_t epochs();
 // Game frames since the latest epoch (since the start when there was none).

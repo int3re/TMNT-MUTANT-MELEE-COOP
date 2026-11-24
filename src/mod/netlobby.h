@@ -40,6 +40,7 @@ struct View {
   std::vector<Game> games;    // friends' games
   std::string addresses;      // hosting: where an address player dials
   std::string error;          // the last thing that went wrong (Russian)
+  bool playing = false;       // joined: the host's game is being played; this player comes in between two fights
 };
 
 void install(const Config& cfg);
@@ -55,5 +56,9 @@ void leave();   // back to looking
 void start();   // host: the start
 
 const View& view();
+
+// This game starts itself again into a session ("host" / "join"; over "steam", "enet" or "both"), and closes.
+// The network page does it at the host's start; a running session does it to let another player in.
+void start_again(const wchar_t* mode, const wchar_t* via, uint64_t peer, const std::string& join, int players);
 
 }  // namespace netlobby

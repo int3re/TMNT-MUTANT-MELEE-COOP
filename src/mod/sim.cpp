@@ -15,6 +15,7 @@
 #include "mod/notice.h"
 #include "mod/patch.h"
 #include "mod/sound.h"
+#include "mod/story.h"
 #include "mod/video.h"
 
 namespace sim {
@@ -42,7 +43,12 @@ Frame_t oFrame = nullptr;
 Movie_t oMovie = nullptr;
 
 LARGE_INTEGER g_qpf{}, g_next{};
+bool g_late = false;                 // the game is more than a frame behind its clock
+int g_skipped_row = 0;               // pictures left out in a row
+std::atomic<unsigned> g_skipped{0};  // pictures left out so far
 bool g_epoch_pending = false;
+bool g_epoch_boot = false;  // the epoch is the game's very first mode entered anew (the whole start-up again)
+const char kFirstMode[] = "TtMemCardBootCheckMode";
 uint32_t g_epoch_seed = 0;
 uint32_t g_epochs = 0;
 bool g_menu_seen = false;  // the main menu has been entered once: the start-up is over
@@ -62,7 +68,9 @@ void pace() {
   LARGE_INTEGER now;
   QueryPerformanceCounter(&now);
   LONGLONG step = g_qpf.QuadPart / 60;
-  if (g_next.QuadPart == 0 || now.QuadPart - g_next.QuadPart > step * 6) g_next = now;  // (a long frame: no catching up)
+  // (a quarter of a second behind: a long frame, a level loaded - no catching up)
+  if (g_next.QuadPart == 0 || now.QuadPart - g_next.QuadPart > step * 15) g_next = now;
+  g_late = now.QuadPart - g_next.QuadPart > step;
   while (now.QuadPart < g_next.QuadPart) {
     LONGLONG left_ms = (g_next.QuadPart - now.QuadPart) * 1000 / g_qpf.QuadPart;
     if (left_ms > 2)
@@ -98,6 +106,92 @@ void __cdecl hkFrame(char update) {
   DWORD before = g_update_thread.exchange(GetCurrentThreadId());
   oFrame(update);
   g_update_thread = before;
+}
+
+// The picture of a game frame. A PC that cannot draw 60 pictures a second would play the game slower
+// than it is, and in a session every PC plays at the pace of the slowest. So while the game is behind
+// its clock, a fight's frame is played without its picture: up to three in a row (the game's own draw
+// function has such a rule for the consoles; it never fires with the mod's steady clock).
+//
+// Drawing takes random numbers too (sparks, smoke: a number more or less by what is in view), from the
+// same generator the game's rules use. So the generator is put back after every picture: what is drawn,
+// how wide, or whether at all never moves the numbers the rules get.
+using Draw_t = void(__cdecl*)(int);
+Draw_t oDraw = nullptr;
+bool g_in_draw = false;
+
+struct RandomState {
+  uint32_t next = 0, tap = 0, size = 0;
+  uint8_t table[0x400];
+};
+
+uint32_t* random_head() {
+  uintptr_t globals = *reinterpret_cast<const uintptr_t*>(game::kRwGlobals);
+  int off = *reinterpret_cast<const int*>(game::kRandomOffset);
+  if (!globals || off <= 0) return nullptr;
+  auto st = reinterpret_cast<uint32_t*>(globals + off);  // {table, next, tap, end}
+  return st[0] && st[3] > st[0] && st[3] - st[0] <= 0x400 ? st : nullptr;
+}
+
+bool random_save(RandomState& s) {
+  uint32_t* st = random_head();
+  if (!st) return false;
+  s.next = st[1], s.tap = st[2], s.size = st[3] - st[0];
+  memcpy(s.table, reinterpret_cast<const void*>(st[0]), s.size);
+  return true;
+}
+
+void random_load(const RandomState& s) {
+  uint32_t* st = random_head();
+  if (!st || st[3] - st[0] != s.size) return;
+  st[1] = s.next, st[2] = s.tap;
+  memcpy(reinterpret_cast<void*>(st[0]), s.table, s.size);
+}
+
+// The game's particles (TtPtxSystem's Update) take their numbers from the rules' generator as well, and
+// which particle systems there are, and in what order, depends on what the game has shown before: a
+// game that has played a fight keeps some of them. So the particles have a generator state of their
+// own, swapped in for the call: sparks and smoke differ from PC to PC, the rules' numbers never.
+using PtxUpdate_t = void(__fastcall*)(void*, void*);
+PtxUpdate_t oPtxUpdate = nullptr;
+bool g_in_ptx = false;
+
+void __fastcall hkPtxUpdate(void* self, void* edx) {
+  static RandomState rules, own;
+  static bool have_own = false;
+  if (g_in_draw || g_in_ptx || g_update_thread.load() != GetCurrentThreadId() || !random_save(rules)) {
+    oPtxUpdate(self, edx);
+    return;
+  }
+  if (have_own) random_load(own);
+  g_in_ptx = true;
+  oPtxUpdate(self, edx);
+  g_in_ptx = false;
+  have_own = random_save(own);
+  random_load(rules);
+}
+
+void __cdecl hkDraw(int arg) {
+  if (g_update_thread.load() != GetCurrentThreadId() || g_in_movie.load() != 0) {
+    oDraw(arg);  // (a loading screen's picture, on the game's second thread)
+    return;
+  }
+  if (*reinterpret_cast<void**>(game::kMode) == *reinterpret_cast<void**>(game::kModeMeleeGame)) {
+    bool skip = g_cfg.lab_draw_every > 1 ? g_tick.load() % g_cfg.lab_draw_every != 0
+                                         : g_cfg.frame_skip && g_late && g_skipped_row < 3;
+    if (skip) {
+      ++g_skipped_row;
+      ++g_skipped;
+      return;
+    }
+  }
+  g_skipped_row = 0;
+  static RandomState kept;
+  bool have = random_save(kept);
+  g_in_draw = true;
+  oDraw(arg);
+  g_in_draw = false;
+  if (have) random_load(kept);
 }
 
 // A movie (the attract movie, the library's clips) is a loop inside one frame, as long as the movie.
@@ -136,6 +230,7 @@ double __cdecl hkSince(const LARGE_INTEGER* stamp) {
 
 uint32_t __cdecl hkRandom() {
   uint32_t v = oRandom();
+  if ((g_in_draw || g_in_ptx) && g_update_thread.load() == GetCurrentThreadId()) return v;  // (a picture's own: not the rules')
   ++g_rng_calls;
   if (g_rng_log && !(g_cfg.lab_epoch && !g_epochs)) {
     uint32_t f = since_epoch();
@@ -223,15 +318,21 @@ void on_enter(void* mode) {
     g_next.QuadPart = 0;
   }
   if (strcmp(class_name(mode), "TtGameStartMode") == 0) g_menu_seen = true;
-  if (!g_epoch_pending || strcmp(class_name(mode), "TtGameStartMode") != 0) return;
+  if (!g_epoch_pending || strcmp(class_name(mode), g_epoch_boot ? kFirstMode : "TtGameStartMode") != 0) return;
   g_epoch_pending = false;
+  if (g_epoch_boot) {
+    g_menu_seen = false;
+    // (the lab's two copies have no host to take a save from: both begin without one)
+    if (g_cfg.lab_epoch) DeleteFileW((module_dir() + L"tmnt.sv").c_str());
+  }
   if (!g_cfg.lab_keep_modes) restore_modes();
   *reinterpret_cast<float*>(game::kElapsedTime) = 0.0f;
   reseed(g_epoch_seed);
   sound::on_epoch(g_epoch_seed);
   g_epoch_tick = g_tick.load();
   ++g_epochs;
-  LOGI("sim: epoch %u at frame %u (seed %08X): the main menu begins anew", g_epochs, g_epoch_tick, g_epoch_seed);
+  LOGI("sim: epoch %u at frame %u (seed %08X): %s begins anew", g_epochs, g_epoch_tick, g_epoch_seed,
+       g_epoch_boot ? "the game" : "the main menu");
   if (g_log) fprintf(g_log, "EPOCH %u\n", g_epochs);
   if (g_on_epoch) g_on_epoch();
 }
@@ -263,7 +364,7 @@ void __cdecl hkReadDevices() {
   // the lab's script, shots and autoquit count their frames from there.
   if (g_cfg.lab_epoch && !g_epochs && !g_epoch_pending && t >= g_cfg.lab_epoch_at &&
       strcmp(mode_name(), "TtGameStartMode") == 0)
-    request_epoch(0x4D454C45);
+    request_epoch(0x4D454C45, nullptr, g_cfg.lab_epoch_boot);
   bool lab_waits = g_cfg.lab_epoch && !g_epochs;
   uint32_t lf = lab_waits ? 0 : since_epoch();  // the frame as the lab counts it
   if (g_epoch_pending) {
@@ -272,6 +373,8 @@ void __cdecl hkReadDevices() {
   } else if (!netplay::frame(since_epoch())) {
     input::apply_script(lab_waits ? t : lf, lab_waits);
   }
+  if (g_cfg.lab_story_open || g_cfg.lab_ko_enemies || g_cfg.lab_ko_hero || g_cfg.lab_ko_partners) story::lab_frame(lf);
+  if (g_cfg.lab_desync_at && lf == g_cfg.lab_desync_at) reinterpret_cast<uint32_t(__cdecl*)()>(game::kRpRandom)();
   if (g_cfg.lab_notice && lf == g_cfg.lab_notice) notice::say(L"ИГРОК 2 ВЫШЕЛ ИЗ ИГРЫ\nДАЛЬШЕ ВЫ ИГРАЕТЕ ОДИН", 10);
   video::on_frame(lf);
   if (g_log) {
@@ -283,7 +386,7 @@ void __cdecl hkReadDevices() {
             *reinterpret_cast<const float*>(game::kElapsedTime));
   }
   g_rng_calls = 0;
-  if ((g_cfg.autoquit_frame && lf >= g_cfg.autoquit_frame && (!g_cfg.lab_page || netplay::session_game())) ||
+  if ((g_cfg.autoquit_frame && lf >= g_cfg.autoquit_frame && (!g_cfg.lab_page || (netplay::session_game() && netplay::players() >= g_cfg.lab_autoquit_players))) ||
       (g_cfg.autoquit_s && GetTickCount() - g_started_tick >= static_cast<DWORD>(g_cfg.autoquit_s) * 1000)) {
     LOGI("debug: autoquit at frame %u", t);
     flush();
@@ -295,17 +398,19 @@ void __cdecl hkReadDevices() {
 }  // namespace
 
 uint32_t frame() { return g_tick.load(); }
+unsigned pictures_skipped() { return g_skipped.load(); }
 uint32_t since_epoch() { return g_tick.load() - g_epoch_tick; }
 uint32_t epochs() { return g_epochs; }
 bool epoch_pending() { return g_epoch_pending; }
 
-bool request_epoch(uint32_t seed, void (*then)()) {
-  void* menu = find_mode("TtGameStartMode");
+bool request_epoch(uint32_t seed, void (*then)(), bool boot) {
+  void* menu = find_mode(boot ? kFirstMode : "TtGameStartMode");
   if (!menu) {
-    LOGE("sim: the main menu's mode is not found: no epoch");
+    LOGE("sim: the mode an epoch begins with is not found: no epoch");
     return false;
   }
   g_epoch_seed = seed;
+  g_epoch_boot = boot;
   g_epoch_pending = true;
   g_on_epoch = then;
   *reinterpret_cast<void**>(game::kNextMode) = menu;
@@ -380,6 +485,7 @@ void install(const Config& cfg) {
   static const uint8_t frame_head[] = {0xF6, 0x05, 0x90, 0x09, 0x5B, 0x00, 0x01};  // test byte [0x5B0990], 1
   static const uint8_t movie_head[] = {0x81, 0xEC, 0x0C, 0x02, 0x00, 0x00};  // sub esp, 0x20C
   static const uint8_t enter_call[] = {0x8B, 0x01, 0xFF, 0x50, 0x04};        // mov eax, [ecx]; call [eax+4]
+  static const uint8_t draw_head[] = {0x83, 0xEC, 0x14, 0x8D, 0x44, 0x24, 0x04};  // sub esp, 0x14; lea eax, [esp+4]
   if (!patch::bytes_are(game::kClockStep, clock_head, sizeof(clock_head)) ||
       !patch::bytes_are(game::kReadDevices, read_head, sizeof(read_head)) ||
       !patch::bytes_are(game::kFrame, frame_head, sizeof(frame_head)) ||
@@ -393,6 +499,11 @@ void install(const Config& cfg) {
   patch::hook("the game's clock", game::kClockStep, (void*)&hkClockStep, (void**)&oClockStep);
   patch::hook("the frame gate (devices read)", game::kReadDevices, (void*)&hkReadDevices, (void**)&oReadDevices);
   patch::hook("the game's movie player", game::kPlayMovie, (void*)&hkMovie, (void**)&oMovie);
+  static const uint8_t ptx_head[] = {0x83, 0xEC, 0x4C, 0x55, 0x56, 0x8B, 0xF1};  // sub esp, 0x4C; push ebp; push esi; mov esi, ecx
+  if (!cfg.free_clock && patch::bytes_are(game::kPtxUpdate, ptx_head, sizeof(ptx_head)))
+    patch::hook("the game's particles (random numbers of their own)", game::kPtxUpdate, (void*)&hkPtxUpdate, (void**)&oPtxUpdate);
+  if (!cfg.free_clock && patch::bytes_are(game::kDraw, draw_head, sizeof(draw_head)))
+    patch::hook("the game's picture (frames without one when the PC is behind)", game::kDraw, (void*)&hkDraw, (void**)&oDraw);
   if (!cfg.free_clock) {
     patch::hook("the game's stopwatch (start)", game::kStopwatchStart, (void*)&hkStamp, (void**)&oStamp);
     patch::hook("the game's stopwatch (read)", game::kStopwatchRead, (void*)&hkSince, (void**)&oSince);

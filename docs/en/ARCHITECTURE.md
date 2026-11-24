@@ -49,9 +49,9 @@ is listed [at the end of the page](#what-has-not-been-checked).
 - Hooks are [MinHook](https://github.com/TsudaKageyu/minhook) trampolines (`patch.cpp`). Besides them the
   mod redirects a few entries of the import table (`Direct3DCreate8`, the window's functions), hooks
   methods of the Direct3D 8 interfaces and changes bytes of the code in memory in a few places. Before a
-  function of the game is hooked, `sim.cpp`, `input.cpp`, `menu.cpp` and `sound.cpp` compare its first
-  bytes with what they should be; if they differ, that feature is switched off and the log says so. The
-  file `ztmnt.exe` on the disk is not changed.
+  function of the game is hooked, `sim.cpp`, `input.cpp`, `menu.cpp`, `sound.cpp`, `story.cpp` and
+  `digits.cpp` compare its first bytes with what they should be; if they differ, that feature is switched
+  off and the log says so. The file `ztmnt.exe` on the disk is not changed.
 
 ## Time: the same on every computer
 
@@ -65,8 +65,15 @@ smoothed. Two computers would never make the same steps. So the mod gives the ga
   reading of the devices is the mod's *frame gate*: this is where it is decided what the game learns of
   the pads of this frame.
 - **The mod holds the frames at 60 a second** itself. The clock's step does not depend on real time: a
-  frame that took longer than 1/60 s still moves the game by one step, and after a long frame the mod does
-  not catch up.
+  frame that took longer than 1/60 s still moves the game by one step, and after a long frame — a level
+  has loaded — the mod does not catch up.
+- **A frame without its picture.** One function of the game draws a game frame's picture (0x4051E0), and
+  the mod is hooked on it. A computer that cannot draw 60 pictures a second would play the game slower
+  than it is, and in a network game everybody plays at the pace of the slowest. So while the game is more
+  than a frame behind its clock, a fight's frame is played without its picture — up to three in a row
+  (`[video] frame_skip`, on by default). This is done in the fight's mode only: menus and a fight's opening
+  are drawn every frame. The game's own function has such a rule — for the consoles — but with the mod's
+  steady clock it never fires.
 - **A loading screen is not the game's time.** While the main thread loads a level, the game's second
   thread draws the loading screen and calls the same system update — as many times as the loading takes,
   which is different on every computer. The mod does not count those passes as game frames: the game's
@@ -90,6 +97,15 @@ at all on a computer without sound. So the mod answers, by the game's clock (`so
 exactly as long as its clip in `soundPC\VCLIP.BKT`, counted in game frames from the frame it was asked
 for. Which of an event's lines is said, the mod draws from numbers of its own.
 
+Drawing and particles are one more case (`sim.cpp`). While it draws a frame the game takes random numbers
+too — for sparks, for smoke: a number more or less by what is in view — and from the same generator the
+rules use. So after every picture the mod puts the generator back as it was before it: what is drawn, how
+wide the frame is, or whether it is drawn at all does not move the numbers the rules get. A particle
+system's update (0x481A50) draws from there as well, and which particle systems there are, and in what
+order, depends on what the game has shown before. So the particles have a generator state of their own: the
+mod swaps it in for the call. Sparks and smoke may differ from computer to computer; the rules' numbers do
+not.
+
 ### Why a network game begins with a restart
 
 The game is the same on every computer only if it has the same past, and a game that has already played a
@@ -97,6 +113,11 @@ fight keeps traces of it. In the lab two fresh copies with one script of presses
 first frame (5200 frames, with a fight), while a copy that has already played a fight parts from a fresh
 one after about 500 frames of a fight. So a network game is a game **started anew**: it has no past. The
 players meet before its first frame and play the same from the very first one.
+
+Doing without a restart was tried. A game that has already played keeps things of it — the order of its
+particle systems, the AI's queued messages — so two games with different pasts part; only a fresh start
+makes them the same. This is why a new player comes into a running session by a restart too: between two
+fights every game starts again ([The host's door](#the-hosts-door-coming-into-a-running-game)).
 
 ## A network game: lockstep
 
@@ -109,8 +130,10 @@ are two to four computers; the host is the centre: the guests talk to it only.
 - A frame begins only when the pads of all players for it are known. A packet carries every frame the
   other side has not acknowledged yet, so lost packets cost nothing but time.
 - Every 60 frames the guests send the host a fingerprint of the game's state (the random number generator
-  and the game's time). If the fingerprints differ, every copy writes it into the log and shows «ИГРЫ
-  РАЗОШЛИСЬ» (the games have parted).
+  and the game's time). A guest's game may be a frame or two ahead of the host's: the host keeps the
+  fingerprint of a frame it has not played yet and compares it when it gets to that frame. If the
+  fingerprints differ, every copy writes it into the log and shows «ИГРЫ РАЗОШЛИСЬ» (the games have
+  parted).
 - A second thread keeps the connection alive while the game's own thread is busy for seconds (a level
   being loaded, a window being dragged).
 - At the meeting a guest tells the host the fingerprints of its `ztmnt.exe` and `archive.arc`; the host
@@ -119,12 +142,40 @@ are two to four computers; the host is the centre: the guests talk to it only.
 - A network game is played on the host's save. A guest receives it and writes into a file of its own,
   `tmnt-net.sv`: the save file's name is replaced in the game's code; the guest's own save is not touched.
 - If a guest has left, or nothing is heard from it for 15 seconds, the network game goes on without it
-  while at least one guest remains. If the host has left, it is over; everybody plays on alone.
+  while at least one guest remains. From the frame the host let it go, the pad of the one who left carries
+  a "gone" mark — a bit the game never reads: every computer knows from the same frame who is in. If the
+  host has left, the network game is over; everybody plays on alone.
+- A game for which the session is over shuts its transport and its Steam lobby: the port and the place on
+  Steam are free, and a new network game can be opened or joined from the same running game.
+- **The pause.** The game reads the pause key and the pause menu from one pad only — the one that leads
+  the menus. In a session, before the game gets a frame's pads, the mod adds the other players' Esc to the
+  leading pad and, while the fight is paused, their Enter too: any player pauses and goes on. While the
+  highlight is on the pause menu's second row — leave the fight — the others' keys are not added: that row
+  stays the leader's.
 
 Transports (`src/common`): **ENet** over UDP for a game by address, **Steam Networking Messages** for a
 game over Steam (through Valve's test application Spacewar, AppID 480), and a stand-in for Steam that the
 lab uses to run several "Steam players" on one computer. The host listens both ways at once: one network
-game may have guests from Steam and guests by address (`multi_transport.h`).
+game may have guests from Steam and guests by address (`multi_transport.h`). In a session the host listens
+both ways as well, whichever way its first guests came: a later player may come the other way.
+
+### The host's door: coming into a running game
+
+The games of a session are the same because they started together. A player who comes later — or comes
+back after a lost link — waits at the host's "door" (`netplay.cpp`).
+
+- While the session is played the host still answers a `Knock` from a game that is not in it: it checks
+  the protocol's version and the fingerprints of `ztmnt.exe` and `archive.arc`, counts the places — four at
+  most in a session, those who wait included — and answers with a `Lobby` marked "the host's game is being
+  played", or with a refusal. The host's Steam lobby stays for the time of the game, in the state `ingame`:
+  friends see the game in their list and can choose it.
+- The one who waits stands on the network page. If a fight is going on, the host shows a notice about the
+  new player.
+- When the session is between two fights — the modes of the main menu, of the choice of a hero, of an
+  arena and of a fight's options, of the story's choice of a hero and of its map — the host sends `Go` to
+  every game of the session and to every game at the door. A moment later each of them starts itself again
+  into a session of all of them: the way the games start from the network page.
+- A fight is not interrupted for it: the host waits for a mode between fights.
 
 ### What had to be made the same
 
@@ -137,6 +188,7 @@ lines, this is what the mod pins down:
   game.
 - **Particles.** How many particles to make, the game decides with random numbers, so in a network game
   the particles setting is 100 % for everybody.
+- **Drawing and the particles' update** take no random numbers from the rules (above).
 - **Movies** are not played (above).
 - **The frame's shape is no part of the logic**: copies with a 16:9 and a 4:3 frame compute the same. So
   every player has a window and a resolution of their own.
@@ -154,6 +206,31 @@ five "keys" no keyboard has — the left, right and middle buttons of the mouse 
 takes their state from Windows while the game's window is in front and the pointer is over its picture.
 That is why a button of the mouse can be bound to an action like a key: these are the game's own
 bindings, and over the network they go as ordinary controls.
+
+## The story together
+
+In the game itself the story is for one: a hero against the matches of a script. But a story match is
+built from the same parts as a fight of РУКОПАШНЫЙ БОЙ (Melee): up to eight fighters in two teams, and the
+hero's team may have "friends" from the script — led by the computer, and unable to hurt their own side. In
+a network session the mod adds the other players to every match as such friends and hands their fighters to
+those players' pads (`story.cpp`).
+
+- The hook is on the game's function that builds a match's fighters (0x455F00). Before it, the mod adds a
+  "friend" record per partner to the match — at the end of the friends' list: the story reads "the hero's
+  side has won" from the first places. After it, the fighters built from those records get a human in
+  place of the computer, and their player's pad.
+- A partner's record: the turtle by the player's number (or the first one nobody has, if that turtle is
+  the hero), the hero's team, the hero's health, a HUD panel — a free one or, if none is free, one of the
+  enemies'.
+- A "last man standing" match becomes a team one, and the hero's rule "the hero's knock-out ends the
+  match" is taken off: a side wins when the other side is down. In a survival match without a clock an
+  enemy's record gets the rule "the end when the team is down": such a match ends when the enemies' side is
+  down. The mod touches no other rule of a match.
+- Partners are not added: to the training matches with the mecha turtle, to the bomb match and the other
+  mini-games; to a match where an enemy has a second life — it comes back as another one (the game counts
+  the records of such matches by their place, and a record more would shift them); to a match that uses all
+  eight places.
+- Before a match is built again, the mod takes out of it what it added.
 
 ## The picture
 
@@ -183,6 +260,8 @@ through the mod and is made wider on the way (`uiwide.cpp`):
   few stretched texels (black boxes, lines) are stretched further; the brick walls along the bottom and
   the loading screen's picture get a second element beside them with the texture mirrored; the headings'
   plates and the speed lines get a second element made of the one column of texels at the edge;
+- a black border that stands right at the layout's edge (the story's results screen) is moved to the
+  frame's edge as narrow as it was, not stretched across the wall beside it;
 - an element that waits beyond the layout's edge to slide in, or slides out beyond it, waits beyond the
   frame's edge;
 - texts, buttons and portraits stay in their 4:3 places.
@@ -205,9 +284,15 @@ The mod draws no windows of its own over the game (`menu.cpp`).
 - **The words.** The mod writes its texts into the game's language table, over strings that only another
   console shows (its memory-card messages) — in place and no longer than the old ones (`gametext.cpp`).
 - **The font.** In the Russian release's font the Cyrillic letters are painted in the places of the small
-  Latin letters and of some digits, and the game's texts are written in that "cipher". The mod writes the
-  same way. The digits 4 and 6 are the letters «ч» and «б» on the screen, so the players' places in the
-  list are numbered with Roman numerals.
+  Latin letters and of two digits: Ч stands in the place of 4, Б in the place of 6. The game's texts are
+  written in that "cipher", and the mod writes the same way.
+- **The digits 4 and 6.** `digits.cpp` gives the menu font a real 4 and 6: two new glyphs under codes that
+  no text of the game uses. The 6 is the font's own 9 turned half a turn; the 4 is painted into a free cell
+  of the font's picture (`glyph4.h`, made by `tools/glyph_four.py`). A hook on the game's text drawing
+  (0x40AC30) replaces, on the way to the font, the 4s and 6s that are digits and not letters: a word
+  without small Latin letters is a number. A few words made of "digits" only (ОБ, ОБО, БОБ, ЗОБ, ОБОЗ) and
+  a lone Б after ЧТО and ПЛАНА stay letters. The players' places in the list are numbered 1.–4.; if the
+  font could not be added to, they are numbered I.–IV., as in 0.1.x.
 - **Messages** at the top of the frame — who has left, that the games have parted — are drawn by the game
   itself, with its own text drawing, right after the mode has drawn the frame (`notice.cpp`, `menu.cpp`).
 
@@ -215,7 +300,9 @@ The players meet on the page while everybody's game is an ordinary single game (
 opens a game — a Steam lobby for friends and a UDP port for an address — and up to three others find it
 among their friends' games or type the address. When the host starts, each game starts itself again with
 the network game written into environment variables: it begins with the process, before the first frame.
-The log of the game that ran before the restart stays in `meleenet-menu.log`.
+The log of the game that ran before the restart stays in `meleenet-menu.log`. A game that knocks at a host
+whose session is being played waits on the same page: the host answers it from the session
+([The host's door](#the-hosts-door-coming-into-a-running-game)).
 
 ## Modules of the mod
 
@@ -225,13 +312,15 @@ The log of the game that ran before the restart stays in `meleenet-menu.log`.
 | `patch.cpp` | hooks, checked changes of bytes, redirected imports |
 | `config.cpp` | `meleenet.ini` |
 | `game.h` | the addresses and structures of `ztmnt.exe` |
-| `sim.cpp` | the clock, the frame gate, the pace, the stopwatches, the lab's frame log |
+| `sim.cpp` | the clock, the frame gate, the pace, frames without their pictures, random numbers of their own for drawing and particles, the stopwatches, the lab's frame log |
 | `input.cpp` | the players' pads, the mouse's buttons, the lab's script |
-| `netplay.cpp` | the network game: the meeting before the first frame, lockstep, checks, players leaving |
+| `netplay.cpp` | the network game: the meeting before the first frame, lockstep, checks, players leaving, anybody's pause, the host's door |
+| `story.cpp` | the story together: partners in a match's records, their fighters to the players' pads; the lab's switches for the story |
 | `multi_transport.h` | Steam and an address at the host at once |
 | `netlobby.cpp` | meeting on the network page: Steam's lobby, the address, the games' restart |
 | `menu.cpp` | the main menu and the network pages made of the game's buttons; showing the messages |
 | `gametext.cpp` | the mod's texts in the game's language table, the Russian release's font |
+| `digits.cpp`, `glyph4.h` | a real 4 and 6 in the menu font: two glyphs, and the digits replaced on the way to the text drawing |
 | `uiwide.cpp` | the screens' scripts made as wide as a wide frame |
 | `notice.cpp` | a message and how long it is shown |
 | `video.cpp` | the window, the device, the frame's size and shape, smoothing and filtering, the lab's pictures |
@@ -276,7 +365,14 @@ the launcher itself.
 - The game's real window in front of a player: the keyboard, the mouse, typing an address.
 - The launcher in a person's hands — under a real mouse and keyboard.
 - Gamepads.
-- Long network games, a pause in a network game, a guest leaving in the middle of a fight.
-- The story mode over the network: in the game itself it is for one player, the others watch.
+- Long sessions.
+- The story together: a duel stage and a team stage were played in the lab, not every stage of every hero.
+- Coming into a running game and coming back after a lost link — on real Steam.
 - Wide menus on the screens of a fight's results, of the story's victory, defeat and unlocks, and in the
-  credits: those screens were not pictured in the lab.
+  credits: those screens were not pictured in the lab. The exception is the story's results screen: in
+  0.2.0 its black borders were put at the picture's edges.
+
+Checked in the lab in version 0.2.0: the story on two and three copies, a third copy coming in during a
+fight of two (by address and through the stand-in for Steam), a guest coming back after a lost link, a
+guest's pause and the leader leaving the fight, frame skipping on one copy of two. In detail — in the
+[history of versions](CHANGELOG.md#020).

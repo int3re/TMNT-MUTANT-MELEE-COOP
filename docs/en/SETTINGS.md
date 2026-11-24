@@ -31,9 +31,21 @@ time.
 | **Контуры героев** (the heroes' outlines) | Рисованные (drawn) · Выкл | `toon_shading = 1 \| 0` |
 | **Тени** (shadows) | Живые (live) · Простые (simple) | `shadows = 1 \| 0` |
 | **Частицы** (particles) | Все (all) · Меньше (fewer) · Мало (few) | `particles = 100 \| 70 \| 40` |
+| **Пропуск кадров** (frame skipping) | Вкл (on) · Выкл (off) | `frame_skip = 1 \| 0` |
+
+The rows stand in two boxes: **ЭКРАН** (Screen) holds the first four, **КАРТИНКА** (Picture) the rest;
+«Пропуск кадров» is the last row of КАРТИНКА. It came with launcher 1.2.0 and mod 0.2.0.
 
 A row that has no effect now is shown pale: **Меню** — with the frame's shape «4:3 с полосами» (such a
-frame has no sides for the menus to fill) and with an installed mod older than 0.1.1.
+frame has no sides for the menus to fill) and with an installed mod older than 0.1.1; **Пропуск кадров** —
+with an installed mod older than 0.2.0.
+
+**Пропуск кадров** (frame skipping). When the computer cannot draw 60 pictures a second, a fight's frames
+are played without their pictures — up to three in a row. The game keeps its real speed, and in a network
+game one slow computer does not slow the fight for the others. It works in fights only: menus and a fight's
+opening are still slowed by a computer that cannot draw them. «Выкл» (off): every frame is drawn, and a slow
+computer slows the game as it did before version 0.2.0. In the lab one copy of two needed 30 ms more for
+every picture: with «Вкл» both played the fight at 60 frames a second, with «Выкл» both at 29.
 
 ### СЕТЬ
 
@@ -67,12 +79,16 @@ leaves your `meleenet.ini` as it is.
 | `toon_shading` | `1` | the heroes' outlines: `1` — drawn, `0` — off |
 | `shadows` | `1` | `1` — live shadows, `0` — simple ones |
 | `particles` | `100` | how many of the particles are drawn, in percent: `0` … `100`. In a network game always `100` |
+| `frame_skip` | `1` | `1` — when the computer cannot draw 60 pictures a second, a fight's frames are played without their pictures (up to three in a row) and the game keeps its speed — in a network game, everybody's; `0` — every frame is drawn. Read by the mod since version 0.2.0 |
 
 `toon_shading`, `shadows` and `particles` are the game's own picture options; the game keeps them in its
 `tmnt.ini` as well. The value in `meleenet.ini` wins; if `meleenet.ini` has no such key, `tmnt.ini` decides.
 
 In version 0.1.0 the file said `menus = bars` by default: the wide menus were not finished then. On an
 update to 0.1.1 the launcher changes that line to `menus = wide`, once; from then on it is yours.
+
+An update leaves your `meleenet.ini` as it is, so a file left from 0.1.x has no `frame_skip` line: the
+default, `1`, is in force until you change the row «Пропуск кадров» in the launcher.
 
 ### `[input]`
 
