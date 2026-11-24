@@ -55,6 +55,13 @@ every picture: with «Вкл» both played the fight at 60 frames a second, with
 | **Видят в Steam** (seen in Steam) | Друзья (friends) · Все (everybody) | `[net] lobby = friends \| public` |
 | **Кнопки мыши в игре** (the mouse's buttons in the game) | Работают (work) · Выкл (off) | `[input] mouse = 1 \| 0` |
 
+Under the rows of the box СЕТЕВАЯ ИГРА (network game) is a note: «Над вашим бойцом — ваш ник из Steam.
+Задержка ввода — у всех игроков та, что у хоста: больше задержка — ровнее игра при плохой связи.» (Over your
+fighter is your Steam name. The input delay is the host's for all players: more of it is smoother on a poor
+connection.) Its first sentence came with launcher 1.3.0 and mod 0.3.0. The tab has no row for a name: a
+player's name is taken from Steam, and the fallback name — `[net] name` — is written into `meleenet.ini` by
+hand ([below](#net)).
+
 ### УПРАВЛЕНИЕ
 
 The keys and the mouse's buttons: see [Controls](CONTROLS.md).
@@ -69,7 +76,7 @@ leaves your `meleenet.ini` as it is.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `mode` | `borderless` | `borderless` — a window without a frame over the whole monitor: the desktop's resolution is not changed and Alt+Tab works at once. `window` — an ordinary window. `game` — as in the original: an exclusive 640×480 full screen; the mod then leaves the screen alone |
+| `mode` | `borderless` | `borderless` — a window without a frame over the whole monitor: the desktop's resolution is not changed and Alt+Tab works at once. `window` — an ordinary window. `game` — as in the original: an exclusive 640×480 full screen; the mod then leaves the screen alone, and a network game starts as in 0.2.0, as a new process: the game closes and opens again ([Network play](NETPLAY.md#the-fallback-the-game-starts-again)) |
 | `resolution` | `auto` | the size of the frame the game draws: `auto` — the monitor's (without a frame) or three quarters of the desktop's height (in a window); `1280x720` — a size of your own, 320x240 at least |
 | `aspect` | `wide` | `wide` — the frame has the shape of the monitor (16:9, 16:10, 21:9), and in fights more is seen at the sides. `4:3` — the original picture with black bars at the sides |
 | `menus` | `wide` | `wide` — the menus fill the whole wide frame: backgrounds, pipes and walls go on to the edges of the screen; `bars` — 4:3 menus with black bars at the sides |
@@ -101,12 +108,26 @@ default, `1`, is in force until you change the row «Пропуск кадров
 
 | Key | Default | Meaning |
 |---|---|---|
-| `name` | `player` | your name on the СЕТЕВАЯ ИГРА (Network game) page, in Latin letters; while it is `player`, the name is taken from Steam if Steam is up |
+| `name` | `player` | the player's fallback name, for when Steam is not running. When Steam is up, your name on the СЕТЕВАЯ ИГРА (Network game) page and over your fighter is your Steam name, whatever this line says. Without Steam this line is taken; while it is `player`, the tag over the fighter says «ИГРОК N» (player N) by the player's number. It is written into the file by hand, in UTF-8 or in Windows' own code page (Cyrillic works), 31 bytes at most |
 | `port` | `47830` | the UDP port on which the host waits for guests who join by address. If the host's port is another one, the page shows the host's address with the port, and a guest types the address the same way: `192.168.0.10:47831` |
 | `delay` | `2` | input delay in frames, `1` … `12`; the host's value is the one in force for everybody |
 | `transport` | `auto` | how to connect from the СЕТЕВАЯ ИГРА page: `auto` — over Steam if it runs, and by address; `steam` — Steam only; `enet` — by address only |
 | `lobby` | `friends` | who sees a game opened over Steam: `friends`, or `public` — everybody who has the mod |
 | `connect` | — | the host's address that the row АДРЕС (Address) of the СЕТЕВАЯ ИГРА page starts with (without it the row starts as `192.168.0.`): so as not to type the address every time |
+
+**The player's name.** Since version 0.3.0 the name of every player is written over that player's fighter in
+a network game ([Network play](NETPLAY.md#names-over-the-fighters)). Where it comes from:
+
+1. from Steam — the player's Steam name, if Steam is running. Steam is asked even when the game itself goes by
+   address; with `transport = enet` the mod does not turn to Steam at all;
+2. without Steam — from the line `name`, if you wrote a name there yourself;
+3. otherwise — «ИГРОК N» (player N) by the player's number.
+
+The mod reads the line `name` when the game starts. The file may be saved in UTF-8 or in Windows' own code
+page — the one Notepad saves it in: a value that does not read as UTF-8 is taken as written in Windows' code
+page. Its length is 31 bytes at most: a Latin letter or a digit takes one byte, a Cyrillic letter in UTF-8
+takes two; the rest is cut off. The tag over a fighter holds the first 16 characters of a name. Before version
+0.3.0 the line `name` was the name on the СЕТЕВАЯ ИГРА page and had to be written in Latin letters.
 
 ### `[log]`
 

@@ -99,8 +99,8 @@ pale: their settings are kept in `meleenet.ini`, which comes with the mod.
 | **Ставить обновления мода без вопроса** (install the mod's updates without asking) | a newer mod is installed at the start without the button; off by default |
 | **Прокси для GitHub** (a proxy for GitHub): Авто / Нет / Свой | how to reach GitHub when it does not open directly: as Windows is set up and, failing that, through a VPN client on this PC; directly only; or your own HTTP proxy `address:port` |
 | **Изменить** (beside the game's folder) | choose another folder with `ztmnt.exe` |
-| **Открыть журнал** (open the log) | open `meleenet.log` of the game's folder — the log of the game's last run |
-| **Журнал до сессии** (the log before the session) | open `meleenet-menu.log` — the log of the game that stood on the network page before it started itself again into the session. While there has been no network game the button answers «Этого журнала пока нет: он появляется после сетевой игры» (there is no such log yet: it appears after a network game) |
+| **Открыть журнал** (open the log) | open `meleenet.log` of the game's folder — the log of the game's last run. With mod 0.3.0 it holds the network game too: that begins in the same process |
+| **Журнал до сессии** (the log before the session) | open `meleenet-menu.log` — the log of the game that stood on the network page before it started itself again into the session. With mod 0.3.0 this file appears only when a session had to start a new process ([the fallback](NETPLAY.md#the-fallback-the-game-starts-again)); while it is not there the button answers «Этого журнала пока нет: он появляется после сетевой игры» (there is no such log yet: it appears after a network game) |
 | **Переустановить мод** (reinstall the mod) | put the files of the mod in again |
 | **Удалить мод** (remove the mod) → **Точно удалить?** (sure?) | remove what was put in and what the mod wrote itself ([Install](INSTALL.md)) |
 | **Цвет повязки** (the colour of the bandana) | the colour of the honeycomb and of the launcher's accents: four masks to choose from — Leonardo's blue (the default), Raphael's red, Donatello's purple, Michelangelo's orange |
@@ -119,7 +119,7 @@ start of the game. Every row is described in [Settings](SETTINGS.md). The size a
 not change how the game plays, so the players of a network game may have them different.
 
 **Пропуск кадров** (Frame skipping: «Вкл», on, or «Выкл», off; the last row of КАРТИНКА) came with launcher
-1.2.0 and mod 0.2.0; nothing else changed in this version of the launcher. With «Вкл», the default, the
+1.2.0 and mod 0.2.0; nothing else changed in that version of the launcher. With «Вкл», the default, the
 frames of a fight that the computer cannot draw in time are played without their pictures and the game is
 not slowed; in a network game one slow computer does not slow the fight for the others. It works in fights
 only. The row is pale when the mod in the game's folder is older than 0.2.0: that mod does not read the
@@ -136,6 +136,12 @@ setting.
 в игре** (The mouse's buttons in the game). These settings are kept in `meleenet.ini` too. A network game
 itself is not started here but in the game's main menu: СЕТЕВАЯ ИГРА (Network game). More in
 [Network play](NETPLAY.md).
+
+The note under the rows of the box СЕТЕВАЯ ИГРА begins with the words «Над вашим бойцом — ваш ник из Steam»
+(over your fighter is your Steam name): with mod 0.3.0 the name of every player is written over that player's
+fighter in a network game. The launcher has no row for the name: without Steam the tag says «ИГРОК N» (player
+N), or the name written by hand into `[net] name` of `meleenet.ini` ([Settings](SETTINGS.md#net)). That
+sentence is all that changed in launcher 1.3.0, which carries the mod 0.3.0.
 
 ### УПРАВЛЕНИЕ — the keys and the mouse
 

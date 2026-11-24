@@ -17,6 +17,9 @@ namespace menu {
 
 void install(const Config& cfg);
 
+// The game begins anew inside the running process: the main menu's page is the first one again.
+void reset();
+
 // The window's keys and letters while an address is being typed on the network page. True: taken.
 bool on_key(unsigned vk);
 bool on_char(wchar_t ch);

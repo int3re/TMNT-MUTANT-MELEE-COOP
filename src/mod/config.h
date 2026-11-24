@@ -115,6 +115,14 @@ struct Config {
   bool lab_page = false;
   // autoquit_players = N: ... and only in a session of at least N players (a session that lets a player in starts again).
   int lab_autoquit_players = 0;
+  // epoch_again = N: the lab's epoch is repeated whenever game frame N since the last one is reached in the
+  // main menu (the game begins anew again and again: a run of many restores).
+  unsigned lab_epoch_again = 0;
+  // no_rewind = 1: the game's memory is not kept at its start (a session starts a new process, as before 0.3).
+  bool lab_no_rewind = false;
+  // inplace = 1: a session begins inside the running game even when the game's memory cannot be put back
+  // (the start-up is only played again): for the lab's runs of the menu's way.
+  bool lab_inplace = false;
   // address = 1: the network page's address row starts as [net] connect, whatever it is (127.0.0.1 in the lab).
   bool lab_address = false;
   // keep_modes = 1: the modes are not put back at an epoch (to see what that is needed for).

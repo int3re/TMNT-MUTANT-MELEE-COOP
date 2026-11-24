@@ -126,24 +126,27 @@ Steam friends. The list refreshes by itself every few seconds.
 
 **Something is written after the host's name in the list.**
 - «ДРУГАЯ ВЕРСИЯ MELEENET» (another version of meleenet) — you and the host have different network
-  protocols, and such a game cannot be chosen. Version 0.2.0 (protocol 2) does not play with versions 0.1.x
-  (protocol 1): both update.
+  protocols, and such a game cannot be chosen. Versions 0.3.0 (protocol 3), 0.2.0 (protocol 2) and 0.1.x
+  (protocol 1) do not play with each other: both update.
 - «ДРУГОЙ ZTMNT.EXE» (another ztmnt.exe) — different editions of the game; such a game cannot be chosen.
 - «ИДЕТ ИГРА» (a game is going on) — that game is being played, but it can be chosen: you come into it
   between two fights ([Network play](NETPLAY.md#coming-into-a-game-that-is-being-played)).
 
 **The page of the game says ВОЙДЕТЕ ПОСЛЕ БОЯ** (you come in after the fight).
 The host's game is already being played. Wait on this page: as soon as the session is between two fights,
-every game — yours too — closes and starts again, now with you in. A fight is not interrupted for it, so
-the wait lasts until the fight ends.
+everybody's game — yours too — begins anew, now with you in; no window is closed for it. A fight is not
+interrupted for it, so the wait lasts until the fight ends.
 
 **«НОВЫЙ ИГРОК ЖДЕТ: ОН ВОЙДЕТ ПОСЛЕ БОЯ»** (a new player waits: they come in after the fight).
-The host sees this when a new player knocked during a fight. Nothing has to be done: after the fight every
-game starts again, with the new player in.
+The host sees this when a new player knocked during a fight. Nothing has to be done: after the fight
+everybody's game begins anew, with the new player in.
 
-**In the middle of a network game every game closed and opened again.**
+**In the middle of a network game the game went through its start-up again and everybody was in the main
+menu.**
 A new player came in, or one whose link was lost came back: between two fights the session begins anew for
-everybody. After that start everybody is in the main menu; a story goes on from what the host's save holds.
+everybody. No window is closed; a couple of seconds later everybody is in the main menu, and a story goes on
+from what the host's save holds. If your game closed and opened again at that moment, that is the fallback:
+see below, "After НАЧАТЬ ИГРУ my game closed and opened again".
 
 **A game that is being played cannot be joined.**
 - The host of a running game waits for newcomers both on Steam and by address. If one way does not work,
@@ -155,7 +158,7 @@ everybody. After that start everybody is in the main menu; a story goes on from 
 **«ХОСТ НЕ ПУСТИЛ: …»** (the host did not let you in).
 The reason follows the colon: the host has another version of the mod, another version of the game
 (`ztmnt.exe`), other files of the game (`archive.arc`), the game already has four players, or it is already
-starting — in the last case the games are starting again right then, so try a little later. All players
+starting — in the last case the games are beginning anew right then, so try a little later. All players
 need the same game and versions of the mod with the same protocol (the launcher shows it under each
 version).
 
@@ -174,20 +177,39 @@ The game could be opened neither over Steam nor by address: Steam is not availab
 this computer is taken by another program — a second copy of the game, for example. Close it, or set
 another port: `[net] port` in `meleenet.ini`.
 
-**All the games closed after НАЧАТЬ ИГРУ (Start the game).**
-That is how a network game begins: the games close and open again a few seconds later, already in the
-common game.
+**After НАЧАТЬ ИГРУ (Start the game) the screen shows the game's start-up again.**
+That is how a network game begins: the window is not closed, and everybody's game goes through its start-up
+again in a couple of seconds — eight times as fast as usual — until all are in the main menu of the common
+game ([Network play](NETPLAY.md#a-network-game-begins-inside-the-running-game)).
+
+**After НАЧАТЬ ИГРУ my game closed and opened again.**
+Since version 0.3.0 this happens in two cases only, when the mod begins a network game the way version 0.2.0
+did — as a new process ([Network play](NETPLAY.md#the-fallback-the-game-starts-again)):
+
+- `meleenet.ini` has `[video] mode = game` — the game's own exclusive full screen. For the windows to stay
+  open, set ГРАФИКА → **Окно игры** (the game's window) in the launcher to **На весь монитор** (the whole
+  monitor) or **В окне** (in a window);
+- the video device was lost and reset after the game had started — the screen was locked, for example.
+  `meleenet.log` then has the line
+
+  ```
+  anew: the device is being reset: the game's start is no longer kept (a session will start a new process)
+  ```
+
+The network game is not hindered: a game that started again and games that began in place play together. A
+lost video device was not checked in the lab. If the game closed and opened again without these reasons,
+report the problem and attach `meleenet.log` and `meleenet-menu.log`.
 
 **«ИГРОКИ НЕ ПОДКЛЮЧИЛИСЬ. СЕТЕВАЯ ИГРА НЕ НАЧАЛАСЬ»** (the players did not connect; the network game did
 not start).
-After the restart the games did not find each other in 45 seconds. Close the game and begin the network
-game again.
+Having begun anew, the games did not find each other in 45 seconds. The game goes on to its main menu by
+itself — it is your own game again, on your own save. Begin the network game again through СЕТЕВАЯ ИГРА.
 
 **«ИГРОК … ВЫШЕЛ ИЗ ИГРЫ»** (player … has left the game).
 That player has closed the game, or nothing was heard from them for 15 seconds. The others play on. The
 player can come back: for them the session is over, СЕТЕВАЯ ИГРА (Network game) is in their main menu again
 — they join the host as a new player does (ИГРЫ ДРУЗЕЙ В STEAM or ВОЙТИ ПО АДРЕСУ), and between two fights
-every game starts again, with them in. If the only guest has left, the host sees «СЕТЕВАЯ ИГРА ОКОНЧЕНА»
+everybody's game begins anew, with them in. If the only guest has left, the host sees «СЕТЕВАЯ ИГРА ОКОНЧЕНА»
 (the network game is over): for the guest to come back, the host chooses СЕТЕВАЯ ИГРА → СОЗДАТЬ ИГРУ (Open
 a game) again.
 
@@ -198,12 +220,25 @@ is over, and СЕТЕВАЯ ИГРА is in your main menu again — the game nee
 playing with the others, join them as a new player: you are in the game between two fights. If the host has
 closed the game, begin the network game anew.
 
+**After a network game my game went through its start-up again by itself.**
+It is meant to. In a session a guest plays on the host's save. When the session is over for a guest — the
+host left, or the link was lost — and the guest's game is back at its main menu, the game begins anew once
+more, in a couple of seconds, now on the player's own save. This does not happen at the host's: the host
+played on their own save all along.
+
+**Over my fighter it says ИГРОК 2 (player 2), not my name.**
+The name over a fighter is your Steam name, and Steam is not running. Start Steam before the network game
+begins (the game itself may still go by address) — or write a name yourself: in `meleenet.ini`, in the section
+`[net]`, the line `name = your name` ([Settings](SETTINGS.md#net)). The launcher has no such row. With
+`[net] transport = enet` the mod does not turn to Steam at all, and the name comes from that line only. The
+line `name` is read when the game starts.
+
 **In the story my fighter is not in the match.**
-Some matches of the story stay for the hero alone, and the partners watch them: the training matches with
-the mecha turtle, the bomb match and the other mini-games, the four matches where an enemy comes back as
-another one, and matches that already use all eight places
-([Network play](NETPLAY.md#the-story-together)). A partner cannot choose a fighter: it is a turtle by the
-player's number.
+A few matches of the story stay for the hero alone, and the partners watch them: the bomb match and the
+other mini-games, and matches that already use all eight places
+([Network play](NETPLAY.md#the-story-together)). In the training matches with the mecha turtle and in the
+last stages with Shredder the partners fight since version 0.3.0; in 0.2.0 those matches were for the hero
+alone too. A partner cannot choose a fighter: it is a turtle by the player's number.
 
 **In a network game my Enter does not end the pause.**
 While the second row of the pause menu — leave the fight — is highlighted, only the keys of the player who
@@ -231,12 +266,18 @@ delay).
 Open an [issue](https://github.com/int3re/TMNT-MUTANT-MELEE-COOP/issues) and attach, from the game's folder
 of **every** computer of the network game:
 
-- `meleenet.log` — the log of the last run;
-- `meleenet-menu.log` — the log of the game the network game was started from.
+- `meleenet.log` — the log of the last run. Since version 0.3.0 it holds everything: the network page and
+  the network game itself, which begins in the same process;
+- `meleenet-menu.log` — if there is one. It is the log of the game a network game was started from, and it
+  appears only when the network game started as a new process
+  ([the fallback](NETPLAY.md#the-fallback-the-game-starts-again)). The folder may also hold an old file of
+  that name, left from version 0.2.0 or from an earlier network game.
 
 The launcher opens both: the settings → **ЛАУНЧЕР** → **Открыть журнал** (Open the log) and **Журнал до
-сессии** (The log before the session). If the launcher says there is no log, and the game is in a folder an
-ordinary program may not write to (Program Files, for example), look for the logs in
+сессии** (The log before the session); if the second file is not there, the launcher answers «Этого журнала
+пока нет: он появляется после сетевой игры» (there is no such log yet: it appears after a network game) —
+since version 0.3.0 that is the usual answer. If the launcher says the first log is not there either, and the
+game is in a folder an ordinary program may not write to (Program Files, for example), look for the logs in
 `%LOCALAPPDATA%\VirtualStore`, in a folder with the same path as the game's: Windows may put them there.
 Say what version the launcher shows, what you did and what happened.
 

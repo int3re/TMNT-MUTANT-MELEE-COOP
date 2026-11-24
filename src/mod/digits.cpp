@@ -8,13 +8,12 @@
 #include "mod/game.h"
 #include "mod/gametext.h"
 #include "mod/glyph4.h"
+#include "mod/nametag.h"
 #include "mod/patch.h"
 
 namespace digits {
 namespace {
 
-// Codes for the new glyphs: control codes, met in no text of the game.
-constexpr wchar_t kFour = 0x14, kSix = 0x16;
 // Where the 4 is painted: the free cell after the 5 in the font's picture (512 x 256).
 constexpr int kCellX = 470, kCellY = 149;
 
@@ -143,6 +142,17 @@ using DrawText_t = void(__cdecl*)(void*, const wchar_t*, float, float*, int, voi
 DrawText_t oDrawText = nullptr;
 
 void __cdecl hkDrawText(void* font, const wchar_t* text, float size, float* rect, int a, void* brush, int shadow, int b) {
+  // A fighter's tag in a network session: the player's name, in the menu font (it has every letter and digit).
+  std::wstring name;
+  float wide[4];
+  if (nametag::substitute(text, rect, name, wide)) {
+    wchar_t tag[40];
+    wcsncpy(tag, name.c_str(), 39);
+    tag[39] = 0;
+    if (g_ready) rewrite(tag);
+    oDrawText(*reinterpret_cast<void**>(game::kFont), tag, size, wide, a, brush, shadow, b);
+    return;
+  }
   if (!g_ready || !text || font != *reinterpret_cast<void**>(game::kFont)) {
     oDrawText(font, text, size, rect, a, brush, shadow, b);
     return;

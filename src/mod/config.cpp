@@ -4,6 +4,8 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <string>
 
 namespace {
 
@@ -32,6 +34,54 @@ bool get_bool(const std::wstring& path, const wchar_t* section, const wchar_t* k
   std::string s = get(path, section, key, "");
   if (s.empty()) return fallback;
   return s == "1" || s == "true" || s == "yes" || s == "on";
+}
+
+// A value as its bytes are in the file, letters' case kept: a player's name may be Cyrillic. The launcher
+// and a hand-edited file may differ in encoding: UTF-8 when the bytes are valid UTF-8, else Windows' own.
+std::string get_text(const std::wstring& path, const char* section, const char* key, const char* fallback) {
+  FILE* f = _wfopen(path.c_str(), L"rb");
+  if (!f) return fallback;
+  std::string all;
+  char buf[4096];
+  for (size_t n; (n = fread(buf, 1, sizeof(buf), f)) > 0;) all.append(buf, n);
+  fclose(f);
+  if (all.size() >= 3 && static_cast<unsigned char>(all[0]) == 0xEF && static_cast<unsigned char>(all[1]) == 0xBB &&
+      static_cast<unsigned char>(all[2]) == 0xBF)
+    all.erase(0, 3);  // (a byte order mark)
+  std::string now, value;
+  bool found = false;
+  for (size_t i = 0; i < all.size() && !found;) {
+    size_t e = all.find(static_cast<char>(10), i);
+    if (e == std::string::npos) e = all.size();
+    std::string line = all.substr(i, e - i);
+    i = e + 1;
+    while (!line.empty() && (line.back() == 13 || line.back() == 32 || line.back() == 9)) line.pop_back();
+    size_t a = 0;
+    while (a < line.size() && (line[a] == 32 || line[a] == 9)) ++a;
+    if (a >= line.size() || line[a] == ';' || line[a] == '#') continue;
+    if (line[a] == '[') {
+      size_t b = line.find(']', a);
+      now = b == std::string::npos ? std::string() : line.substr(a + 1, b - a - 1);
+      continue;
+    }
+    size_t eq = line.find('=', a);
+    if (eq == std::string::npos || _stricmp(now.c_str(), section) != 0) continue;
+    std::string k = line.substr(a, eq - a);
+    while (!k.empty() && (k.back() == 32 || k.back() == 9)) k.pop_back();
+    if (_stricmp(k.c_str(), key) != 0) continue;
+    size_t v = eq + 1;
+    while (v < line.size() && (line[v] == 32 || line[v] == 9)) ++v;
+    value = line.substr(v);
+    found = true;
+  }
+  if (!found || value.empty()) return fallback;
+  if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.c_str(), static_cast<int>(value.size()), nullptr, 0) > 0) return value;
+  // (not UTF-8: Windows' own code page, as a file edited by hand in Notepad would be)
+  wchar_t wide[128];
+  int n = MultiByteToWideChar(CP_ACP, 0, value.c_str(), static_cast<int>(value.size()), wide, 128);
+  char utf8[400];
+  int m = WideCharToMultiByte(CP_UTF8, 0, wide, n, utf8, sizeof(utf8), nullptr, nullptr);
+  return std::string(utf8, static_cast<size_t>(m > 0 ? m : 0));
 }
 
 }  // namespace
@@ -72,7 +122,8 @@ bool load_config(const std::wstring& path, Config& cfg) {
   cfg.net_mode = net == "host" ? Config::Net::Host : net == "join" ? Config::Net::Join : Config::Net::Off;
   cfg.net_port = get_int(path, L"net", L"port", 47830);
   cfg.net_connect = get(path, L"net", L"connect", "127.0.0.1");
-  cfg.net_name = get(path, L"net", L"name", "player");
+  cfg.net_name = get_text(path, "net", "name", "player");
+  if (cfg.net_name.size() > 31) cfg.net_name.resize(31);
   cfg.net_delay = get_int(path, L"net", L"delay", 2);
   if (cfg.net_delay < 1) cfg.net_delay = 1;
   if (cfg.net_delay > 12) cfg.net_delay = 12;
@@ -130,6 +181,9 @@ bool load_config(const std::wstring& path, Config& cfg) {
   cfg.lab_notice = static_cast<unsigned>(get_int(path, L"debug", L"notice", 0));
   cfg.lab_page = get_bool(path, L"debug", L"page", false);
   cfg.lab_autoquit_players = get_int(path, L"debug", L"autoquit_players", 0);
+  cfg.lab_epoch_again = static_cast<unsigned>(get_int(path, L"debug", L"epoch_again", 0));
+  cfg.lab_no_rewind = get_bool(path, L"debug", L"no_rewind", false);
+  cfg.lab_inplace = get_bool(path, L"debug", L"inplace", false);
   cfg.lab_address = get_bool(path, L"debug", L"address", false);
   cfg.lab_keep_modes = get_bool(path, L"debug", L"keep_modes", false);
   cfg.lab_epoch_at = static_cast<unsigned>(get_int(path, L"debug", L"epoch_at", 0));

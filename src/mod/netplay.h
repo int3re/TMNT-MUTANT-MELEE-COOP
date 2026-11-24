@@ -23,6 +23,14 @@ bool prepare(Config& cfg);
 
 void install(const Config& cfg);
 
+// A session begins inside the running game: the game's memory is put back to a just started process's
+// (rewind.h), and the players meet before the first mode, exactly as in a process started for a session.
+// `via`: "steam", "enet" or "both"; `peer`: the host's SteamID64 (a guest over Steam); `join`: the host's
+// address (a guest by address); `players`: how many the host waits for.
+void begin(bool host, const std::string& via, uint64_t peer, const std::string& join, int players);
+// A session can begin inside the running game (else the game starts itself again as a new process).
+bool in_place();
+
 // True in a game that was started for a session (even before the players have met, and after the session is over).
 bool session_game();
 

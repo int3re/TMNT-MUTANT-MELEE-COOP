@@ -15,10 +15,10 @@ Open an [issue](https://github.com/int3re/TMNT-MUTANT-MELEE-COOP/issues) and say
   `meleenet-launcher.exe`);
 - what you did and what happened; for a network game, how many players there were, who was the host and
   how you connected (Steam or an address);
-- attach, from the game's folder, `meleenet.log` and — if the network game was started from the page
-  СЕТЕВАЯ ИГРА (network game) — `meleenet-menu.log`, **from every PC**. Without the other players' logs a
-  network error can rarely be found. The launcher opens both logs: its settings → ЛАУНЧЕР (launcher) →
-  «Открыть журнал» (open the log) and «Журнал до сессии» (the log before the session).
+- attach, from the game's folder, `meleenet.log` — **from every PC**. Without the other players' logs a
+  network error can rarely be found. If the game closed and started again for the network game (the
+  fallback), attach `meleenet-menu.log` too. The launcher opens both logs: its settings → ЛАУНЧЕР
+  (launcher) → «Открыть журнал» (open the log) and «Журнал до сессии» (the log before the session).
 
 Look the logs through before posting: they hold the game's folder and the players' names, after a game by
 address the addresses, after a game over Steam your Steam name and Steam IDs. Those lines can be removed.

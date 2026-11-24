@@ -590,6 +590,13 @@ void type(char c) {
 
 }  // namespace
 
+void reset() {
+  g_page = Page::Main;
+  g_act = Act::None;
+  g_typing = false;
+  g_quiet = 0;
+}
+
 bool on_key(unsigned vk) {
   if (!g_typing) return false;
   if (vk == VK_RETURN || vk == VK_ESCAPE) {

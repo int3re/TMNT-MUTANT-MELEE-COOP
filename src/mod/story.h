@@ -11,6 +11,9 @@ namespace story {
 
 void install(const Config& cfg);
 
+// The game's memory was put back to its beginning: nothing of the mod is in any match.
+void reset();
+
 // Lab: every stage of the story being played is open.
 void lab_open_stages();
 // Lab, every game frame: [debug] story_open, ko_enemies / ko_hero / ko_partners.

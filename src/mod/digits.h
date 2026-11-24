@@ -12,6 +12,9 @@
 
 namespace digits {
 
+// Codes of the real 4 and 6 in the menu font once it has them (control codes no text of the game uses).
+constexpr wchar_t kFour = 0x14, kSix = 0x16;
+
 void install(const Config& cfg);
 
 // After the game has loaded its fonts and texts: the glyphs are added.

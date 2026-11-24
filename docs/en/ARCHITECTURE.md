@@ -47,11 +47,12 @@ is listed [at the end of the page](#what-has-not-been-checked).
   runs as it does without the mod, and `meleenet.log` has a line about it. Only the writing of crashes
   into the log works then.
 - Hooks are [MinHook](https://github.com/TsudaKageyu/minhook) trampolines (`patch.cpp`). Besides them the
-  mod redirects a few entries of the import table (`Direct3DCreate8`, the window's functions), hooks
-  methods of the Direct3D 8 interfaces and changes bytes of the code in memory in a few places. Before a
-  function of the game is hooked, `sim.cpp`, `input.cpp`, `menu.cpp`, `sound.cpp`, `story.cpp` and
-  `digits.cpp` compare its first bytes with what they should be; if they differ, that feature is switched
-  off and the log says so. The file `ztmnt.exe` on the disk is not changed.
+  mod redirects a few entries of the import table (`Direct3DCreate8`, the window's functions,
+  `DirectSoundCreate`), hooks methods of the Direct3D 8 and DirectSound interfaces and changes bytes of the
+  code in memory in a few places. Before a function of the game is hooked, `sim.cpp`, `input.cpp`,
+  `menu.cpp`, `sound.cpp`, `story.cpp`, `digits.cpp` and `nametag.cpp` compare its first bytes with what
+  they should be; if they differ, that feature is switched off and the log says so. The file `ztmnt.exe` on
+  the disk is not changed.
 
 ## Time: the same on every computer
 
@@ -106,18 +107,99 @@ order, depends on what the game has shown before. So the particles have a genera
 mod swaps it in for the call. Sparks and smoke may differ from computer to computer; the rules' numbers do
 not.
 
-### Why a network game begins with a restart
+### The game begins anew without a new process
 
 The game is the same on every computer only if it has the same past, and a game that has already played a
-fight keeps traces of it. In the lab two fresh copies with one script of presses are the same from the
-first frame (5200 frames, with a fight), while a copy that has already played a fight parts from a fresh
-one after about 500 frames of a fight. So a network game is a game **started anew**: it has no past. The
-players meet before its first frame and play the same from the very first one.
+fight keeps traces of it — the order of its particle systems, the AI's queued messages and more, in pools
+and globals that no reset reaches. In the lab two fresh copies with one script of presses are the same from
+the first frame (5200 frames, with a fight), while a copy that has already played a fight parts from a fresh
+one after about 500 frames of a fight. Only a process that has just started has no past. So a network game
+is a game **begun anew**: the players meet before its first frame and play the same from the very first one.
 
-Doing without a restart was tried. A game that has already played keeps things of it — the order of its
-particle systems, the AI's queued messages — so two games with different pasts part; only a fresh start
-makes them the same. This is why a new player comes into a running session by a restart too: between two
-fights every game starts again ([The host's door](#the-hosts-door-coming-into-a-running-game)).
+Before version 0.3.0 "anew" meant a new process: every game closed and started itself again. Since 0.3.0 the
+mod takes the running game back to the state of a just started process — in the same window, with the same
+video device (`rewind.cpp`, the namespace `anew`).
+
+**What is kept.** At the moment the game enters its very first mode (`TtMemCardBootCheckMode`), before the
+mode's `Enter`, the mod copies everything the game's logic lives in (`anew::capture()`):
+
+- the exe's writable sections, 0x583000..0x68A000: `.data` with its bss and RenderWare's data segment. The
+  exe's image is never moved, so the addresses are the same;
+- the game's own heap — one block of 64 MB that the game takes at its start; every allocation of the game
+  and of RenderWare is in it. The used part is kept — everything up to the last byte that is not zero, about
+  8 MB;
+- a handful of blocks the sound code took from the C library's heap at start-up: voices, banks, buffers.
+
+**What lies outside.** The kept memory points at objects outside itself: Direct3D textures, buffers and
+surfaces, DirectSound buffers. Those that were alive when the memory was kept are held — the mod adds a
+reference of its own and remembers their count of references — so that they cannot go away. What was made
+later is nobody's after the memory is put back, and the mod lets it go itself. To know which is which the mod
+watches what is made:
+
+- hooks on the device's methods `CreateTexture`, `CreateCubeTexture`, `CreateVertexBuffer`,
+  `CreateIndexBuffer`, `CreateDepthStencilSurface`, `CreateImageSurface`, and on the making and deleting of
+  vertex and pixel shaders;
+- a Direct3D resource tells of its own end: the mod gives it a "witness" — a piece of private data that is
+  an object (`SetPrivateData` with the `IUnknown` flag); the resource releases it with itself;
+- a sound buffer has no private data, so `DirectSoundCreate` (an import entry of the exe),
+  `CreateSoundBuffer`, `DuplicateSoundBuffer` and a buffer's `Release` are hooked: the mod sees the last
+  `Release`;
+- the device's state is kept in a state block (`CreateStateBlock`).
+
+**Putting it back** (`anew::restore()`) happens at the same place of the code — before the first mode is
+entered — and takes 15–30 ms:
+
+1. the mod waits until the thread that draws the loading screen is out of the game's frame; while a level is
+   being loaded nothing is put back;
+2. a save that is being written is finished; all sounds stop, and the sound buffers made after the memory was
+   kept are let go;
+3. the memory is put back: the exe's variables, the heap (what the game used beyond the kept part is zeroed),
+   the sound blocks. The one thing left as it is now is the game's own lock (its `CRITICAL_SECTION`);
+4. the game's events are reset: a game that has just started has none of them set;
+5. the device gets the kept state (`ApplyStateBlock`) and its render target; the Direct3D resources and
+   shaders made after the memory was kept are let go; the held objects get their count of references of then.
+
+After that the game is a just started process again: its clock, its random numbers and its modes are that
+process's. The start-up is played again — with no logos, eight times as fast as usual
+([below](#what-had-to-be-made-the-same)).
+
+**Who asks for it.** A moment from which two games are the same is an "epoch" in `sim.cpp`:
+`request_epoch()` makes the game's first mode its next mode, and the hook on entering a mode calls
+`anew::restore()` before the mode's `Enter`. A session in place is begun by `netplay::begin()` — the role,
+the way, the number of players, then the epoch — and the players meet as they do in a new process: before
+the first mode. `netlobby.cpp` calls `begin()` instead of starting a process; the games of a session begin
+anew the same way when the host lets a new player in
+([The host's door](#the-hosts-door-coming-into-a-running-game)).
+
+**After a session.** A guest plays a session on the host's save: the save file's name is replaced for the
+time of the session. When the session is over for a guest and the guest's game is back at its main menu, the
+mod asks for an epoch once more: the game begins anew, now on the player's own save. The host's save is the
+host's own all along; its game only stops being a session's game.
+
+**The fallback.** If the memory cannot be kept or put back, a session starts as in 0.2.0, as a new process
+(`netplay::in_place()` says no, and `netlobby.cpp` starts the game again). This is the case:
+
+- with `[video] mode = game` — the game's own exclusive full screen;
+- when the video device is lost and reset (`Reset`) after the game has started: nothing can be held through a
+  reset. Before the reset the mod lets go of everything it held and forgets what it kept
+  (`anew::before_reset()`);
+- when the game's memory is not laid out as the mod expects (the game started with the developers' switch
+  `-usemalloc`, for example), or the device gave no state block.
+
+A game that takes the fallback and games that begin in place play together: the protocol's messages are the
+same.
+
+One change in `video.cpp` belongs here. RenderWare's driver makes a device that "does not wait for the
+monitor" and, at the first picture shown, makes it anew with the waiting on — a device reset in the game's
+very first frame. A window's device has no such setting, and a reset would let nothing be held. When it makes
+a windowed device, the mod tells the driver the waiting is on already: there is no reset in the first frame
+any more.
+
+Checked in the lab: a session begun in place was compared line by line with a session of freshly started
+processes — the same frames; a copy that had played fights and the story and visited the library before the
+session against a copy with no past, both put back to their start — identical 4500 frames; five returns to
+the start in a row after played fights — the process's memory stays about 280 MB and does not grow. Not
+checked: a real game with sound audible (the lab runs muted), and a lost device.
 
 ## A network game: lockstep
 
@@ -173,8 +255,12 @@ back after a lost link — waits at the host's "door" (`netplay.cpp`).
   new player.
 - When the session is between two fights — the modes of the main menu, of the choice of a hero, of an
   arena and of a fight's options, of the story's choice of a hero and of its map — the host sends `Go` to
-  every game of the session and to every game at the door. A moment later each of them starts itself again
-  into a session of all of them: the way the games start from the network page.
+  every game of the session and to every game at the door. A moment later each of them begins anew into a
+  session of all of them: the way the games start from the network page — in place
+  ([above](#the-game-begins-anew-without-a-new-process)) or, by the fallback, as a new process.
+- In place the host begins 0.3 s after `Go` and the guests 1.5 s after it: the host must have closed its old
+  port and opened the new one before a guest dials it. With new processes it is the other way round — a
+  process takes seconds to come up, so the guests go first and the host a moment later.
 - A fight is not interrupted for it: the host waits for a mode between fights.
 
 ### What had to be made the same
@@ -182,10 +268,11 @@ back after a lost link — waits at the host's "door" (`netplay.cpp`).
 Same controls give the same game only if nothing else differs. Besides the clock, the stopwatches and the
 lines, this is what the mod pins down:
 
-- **The start.** In a game started for a network game, until the main menu is entered for the first time,
-  the step of the clock and of the stopwatches is eight times longer and the pace of 60 frames a second is
-  not held — on every computer alike. The "press Enter" screen is pressed for everybody by the host's
-  game.
+- **The start.** In a game that begins a network game — in place or as a new process — until the main menu
+  is entered for the first time, the step of the clock and of the stopwatches is eight times longer and the
+  pace of 60 frames a second is not held — on every computer alike. The "press Enter" screen is pressed for
+  everybody by the host's game. The start-up of a guest whose game goes back to its own save after a session
+  runs the same way: there the mod itself presses "press Enter".
 - **Particles.** How many particles to make, the game decides with random numbers, so in a network game
   the particles setting is 100 % for everybody.
 - **Drawing and the particles' update** take no random numbers from the rules (above).
@@ -226,10 +313,19 @@ those players' pads (`story.cpp`).
   match" is taken off: a side wins when the other side is down. In a survival match without a clock an
   enemy's record gets the rule "the end when the team is down": such a match ends when the enemies' side is
   down. The mod touches no other rule of a match.
-- Partners are not added: to the training matches with the mecha turtle, to the bomb match and the other
-  mini-games; to a match where an enemy has a second life — it comes back as another one (the game counts
-  the records of such matches by their place, and a record more would shift them); to a match that uses all
-  eight places.
+- Partners are not added to the bomb match and the other mini-games — they run in a mode of the game's own,
+  made for one fighter — or to a match that uses all eight places. To the training matches with the mecha
+  turtle partners are added since version 0.3.0: such a match runs in the ordinary mode of a fight.
+- **An enemy's second life** (since version 0.3.0). In the last stages an enemy comes back as another one:
+  its record has a "next life" record. That record takes a place in the list of characters a match loads but
+  gets no fighter of its own. The game gives the i-th loaded character to the i-th fighter, and the match
+  builder puts the second life's character into the list right after the enemy: in the game's own matches
+  that is the last place, and the character lands on the spare fighter after the last one. With partners
+  after the enemy the list would shift, so after the match is built the mod puts the list in order again:
+  every fighter's character first, then the second lives. And a second thing: the round's reset (0x454880)
+  puts records on fighters by a record's place in the lists, and in a match with a second life every friend
+  would land one fighter too far — after the reset the mod puts the friends' records on their real fighters
+  (0x453560). A second life counts when the free places are counted, too.
 - Before a match is built again, the mod takes out of it what it added.
 
 ## The picture
@@ -295,14 +391,26 @@ The mod draws no windows of its own over the game (`menu.cpp`).
   font could not be added to, they are numbered I.–IV., as in 0.1.x.
 - **Messages** at the top of the frame — who has left, that the games have parted — are drawn by the game
   itself, with its own text drawing, right after the mode has drawn the frame (`notice.cpp`, `menu.cpp`).
+- **Names over the fighters** (`nametag.cpp`). The tag over a human's fighter — an arrow in the player's
+  colour and the words "1P"…"4P" — is drawn by one function of the game (0x419FF0, the fighter in `ecx`). A
+  hook on it remembers whose tag the game is drawing. The words themselves go through the same text drawing
+  (0x40AC30) that the digits' hook is on: when a tag is being drawn, the text is "1P"…"4P" and a session is
+  on, the name of the player whose pad leads that fighter is drawn in its place — in the menu font (it has
+  every letter and digit) and in a rectangle twice as wide. The game draws the words' shadow in a second
+  call — by then the text is replaced already. The players tell each other their names at the meeting, in
+  the packets `Hello` and `Welcome`: the Steam name, or without Steam `[net] name` or `player`; the name
+  `player` becomes «ИГРОК N» (player N) on a tag. A tag holds 16 characters at most. Outside a session the
+  tags stay the game's own.
 
 The players meet on the page while everybody's game is an ordinary single game (`netlobby.cpp`): one
 opens a game — a Steam lobby for friends and a UDP port for an address — and up to three others find it
-among their friends' games or type the address. When the host starts, each game starts itself again with
-the network game written into environment variables: it begins with the process, before the first frame.
-The log of the game that ran before the restart stays in `meleenet-menu.log`. A game that knocks at a host
-whose session is being played waits on the same page: the host answers it from the session
-([The host's door](#the-hosts-door-coming-into-a-running-game)).
+among their friends' games or type the address. When the host starts, each game shuts the page's network and
+begins the session in place: `netplay::begin()` takes the game back to its start
+([The game begins anew without a new process](#the-game-begins-anew-without-a-new-process)). By the fallback
+a game starts itself again with the network game written into environment variables: it begins with the
+process, before the first frame; the log of the game that ran before the restart stays in
+`meleenet-menu.log`. A game that knocks at a host whose session is being played waits on the same page: the
+host answers it from the session ([The host's door](#the-hosts-door-coming-into-a-running-game)).
 
 ## Modules of the mod
 
@@ -312,15 +420,17 @@ whose session is being played waits on the same page: the host answers it from t
 | `patch.cpp` | hooks, checked changes of bytes, redirected imports |
 | `config.cpp` | `meleenet.ini` |
 | `game.h` | the addresses and structures of `ztmnt.exe` |
-| `sim.cpp` | the clock, the frame gate, the pace, frames without their pictures, random numbers of their own for drawing and particles, the stopwatches, the lab's frame log |
+| `sim.cpp` | the clock, the frame gate, the pace, frames without their pictures, random numbers of their own for drawing and particles, the stopwatches, epochs (the moments from which games are the same), the lab's frame log |
+| `rewind.cpp` | the namespace `anew`: a copy of the game's memory at the beginning of its start-up and putting that copy back — the game begins anew without a new process; holding the Direct3D and DirectSound objects |
 | `input.cpp` | the players' pads, the mouse's buttons, the lab's script |
-| `netplay.cpp` | the network game: the meeting before the first frame, lockstep, checks, players leaving, anybody's pause, the host's door |
-| `story.cpp` | the story together: partners in a match's records, their fighters to the players' pads; the lab's switches for the story |
+| `netplay.cpp` | the network game: beginning a session inside the running game, the meeting before the first frame, lockstep, checks, players leaving, anybody's pause, the host's door, a guest's return to its own save |
+| `story.cpp` | the story together: partners in a match's records, their fighters to the players' pads, the order of characters and records in a match with an enemy's second life; the lab's switches for the story |
 | `multi_transport.h` | Steam and an address at the host at once |
-| `netlobby.cpp` | meeting on the network page: Steam's lobby, the address, the games' restart |
+| `netlobby.cpp` | meeting on the network page: Steam's lobby, the address, beginning the session — in place or, by the fallback, as a new process |
 | `menu.cpp` | the main menu and the network pages made of the game's buttons; showing the messages |
 | `gametext.cpp` | the mod's texts in the game's language table, the Russian release's font |
 | `digits.cpp`, `glyph4.h` | a real 4 and 6 in the menu font: two glyphs, and the digits replaced on the way to the text drawing |
+| `nametag.cpp` | the players' names over the fighters: a hook on a fighter's tag, and its words replaced in the text drawing |
 | `uiwide.cpp` | the screens' scripts made as wide as a wide frame |
 | `notice.cpp` | a message and how long it is shown |
 | `video.cpp` | the window, the device, the frame's size and shape, smoothing and filtering, the lab's pictures |
@@ -365,8 +475,10 @@ the launcher itself.
 - The game's real window in front of a player: the keyboard, the mouse, typing an address.
 - The launcher in a person's hands — under a real mouse and keyboard.
 - Gamepads.
-- Long sessions.
-- The story together: a duel stage and a team stage were played in the lab, not every stage of every hero.
+- Sound after the game's return to its start: the lab runs muted.
+- A lost video device and the fallback after it.
+- The story together: a duel stage, a team stage, the training and the last stage were played in the lab, not
+  every stage of every hero.
 - Coming into a running game and coming back after a lost link — on real Steam.
 - Wide menus on the screens of a fight's results, of the story's victory, defeat and unlocks, and in the
   credits: those screens were not pictured in the lab. The exception is the story's results screen: in
@@ -376,3 +488,10 @@ Checked in the lab in version 0.2.0: the story on two and three copies, a third 
 fight of two (by address and through the stand-in for Steam), a guest coming back after a lost link, a
 guest's pause and the leader leaving the fight, frame skipping on one copy of two. In detail — in the
 [history of versions](CHANGELOG.md#020).
+
+Checked in the lab in version 0.3.0: sessions of two, three and four copies begun in place (by address and
+through the stand-in for Steam, with antialiasing on and off), and such a session against a session of
+freshly started processes; a copy with a past against a copy without one; five returns to the start in a
+row; a third copy coming into a running game; a guest that loses its link, gets its own game back and joins
+again — five times in a row; a 15000-frame session with two fights played out; the story's last stage with
+three copies and the training with two. In detail — in the [history of versions](CHANGELOG.md#030).

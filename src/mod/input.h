@@ -33,6 +33,8 @@ Pad read_local(unsigned frame);
 
 // What the game is told for `player` (0..3) this frame.
 void write(int player, const Pad& pad);
+// One button of a pad is held down this frame (`value`: game::PadValue).
+void press(int player, int value);
 // A pad the game counts as plugged in (menus listen to plugged-in pads only).
 void set_connected(int player, bool on);
 bool connected(int player);

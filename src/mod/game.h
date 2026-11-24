@@ -159,6 +159,9 @@ constexpr uintptr_t kParticlePercent = 0x005AF468; // int 0..100
 
 // Import slots of the exe.
 constexpr uintptr_t kIatDirect3DCreate8 = 0x0055C228;
+// RenderWare's Direct3D 8 driver keeps the parameters its device was made with at 0x687080; the picture
+// function (0x541E6A..) resets the device when the "wait for the monitor" flag of a picture differs from them.
+constexpr uintptr_t kDriverPresentInterval = 0x006870B0;  // FullScreen_PresentationInterval of those parameters
 
 // --- the interface (ui.cpp) and texts ------------------------------------------------------------------
 // Screens are scripts (ui/scripts/UI_*.txt in the archive): elements with a picture or a text ($N = string
@@ -186,6 +189,7 @@ constexpr uintptr_t kModePlayerSelect = 0x005B08C0, kModeAdventureSelect = 0x005
 constexpr uintptr_t kModeMeleeGame = 0x005B08F4;
 constexpr int kFightPaused = 0x35;       // uint8
 constexpr int kFightPauseCursor = 0x38;  // int: 0 = go on, 1 = leave the fight
+constexpr uintptr_t kDrawTag = 0x00419FF0;        // void __thiscall(fighter): the tag over a human's fighter ("1P")
 constexpr uintptr_t kPlayerObjects = 0x005AF100;  // player*[8]: the fighters' slots
 constexpr int kPlayerPad = 0x10B;                 // uint8: the pad that plays the slot (0xFF: none, the computer does)
 constexpr int kPlayerTeam = 0x2D4;                // int
@@ -195,8 +199,11 @@ constexpr int kPlayerAi = 0x2C8;                  // int: the computer's kind of
 // records by 0x455F00: slot 0 the hero (a human on the leading pad), then the enemies (team 1), then the
 // scripted friends (team 0), each friend and enemy led by the computer.
 constexpr uintptr_t kBuildMatch = 0x00455F00;      // void __thiscall(match)
+constexpr uintptr_t kResetMatch = 0x00454880;      // void __thiscall(match): every record back on its fighter (a round begins)
+constexpr uintptr_t kRecordApply = 0x00453560;     // void __thiscall(record, int slot): health, team, rules of that fighter
 constexpr uintptr_t kRecordInit = 0x00452B40;      // record* __thiscall(record): a fighter's record as new
 constexpr uintptr_t kCharacterName = 0x0042C8F0;   // const char* __cdecl(int id): "leo", "don", "mike", "raph", ...
+constexpr uintptr_t kCharactersToLoad = 0x006753C4;   // int* begin, int* end: the characters a match loads, the i-th for the i-th fighter
 constexpr uintptr_t kStory = 0x00673E30;              // the story's object: +0x28 / +0x2C the stages (stage*, begin and end)
 constexpr uintptr_t kStoryCharacters = 0x006753D0;    // int[8]: the character of every slot; [0] is the story's hero
 constexpr uintptr_t kPlayerCount = 0x005AF1CC;    // int

@@ -10,6 +10,7 @@ only on versions with the same one. Version 0.1.0 was not published; the first p
 
 | Version | Launcher | Protocol | Date | In a line |
 |---|---|---|---|---|
+| [0.3.0](#030) | 1.3.0 | 3 | 24 Nov 2026 | a network game begins inside the running game, no windows closing; players' names over the fighters; the story together to its end |
 | [0.2.0](#020) | 1.2.0 | 2 | 24 Nov 2026 | the story together; coming into a running game; anybody's pause; frame skipping; a real 4 and 6 |
 | [0.1.1](#011) | 1.1.0 | 1 | 24 Nov 2026 | menus fill a wide frame; the launcher has a look of its own and updates the mod and itself |
 | [0.1.0](#010) | 1.0.0 | 1 | 23 Nov 2026 | the first network game, a window and a wide frame, the first launcher |
@@ -18,8 +19,80 @@ Who plays with whom over the network:
 
 | Versions | Protocol | Together |
 |---|---|---|
+| 0.3.0 | 3 | with 0.3.0 only; does not play with 0.2.0 or 0.1.x |
 | 0.2.0 | 2 | with 0.2.0 only; does not play with 0.1.x |
 | 0.1.0 – 0.1.1 | 1 | play with each other |
+
+## 0.3.0
+
+Launcher 1.3.0. Protocol 3: it does not play with 0.2.0 or 0.1.x over the network — every player has to
+update.
+
+Everything listed here was checked in the lab only: two to four copies of the game on one computer, with no
+window on the screen, by address and through the stand-in for Steam. Real Steam accounts, a real focused
+window and gamepads are still not checked by a real game.
+
+- **A network game begins inside the running game: no restart.** Before 0.3.0 a network game began by closing
+  every game and starting it again, as a new process; a player who came into a running game came in by such a
+  restart of every game too. Now nothing is closed: after НАЧАТЬ ИГРУ (Start the game) the picture goes
+  through the game's start-up again in a couple of seconds — eight times as fast as usual, with no logos to
+  sit through — and everybody is in the main menu of the common game. The window, the video device and Steam
+  stay as they are.
+  - Why it is done this way. A game that has already played keeps things of it (the order of its particle
+    systems, the AI's queued messages and more), so two games with different pasts part. A process that has
+    just started has no past. At the moment the game enters its very first mode the mod keeps a copy of the
+    game's whole memory, and to begin a session it puts that copy back (15–30 ms): every PC gets the state of
+    a just started process without a new process. More in
+    [How it works](ARCHITECTURE.md#the-game-begins-anew-without-a-new-process).
+  - A player who comes into a running game, or comes back after a lost link, comes in the same way: between
+    two fights everybody's game begins anew in place — no window is closed — now with that player in.
+  - When a session is over for a guest (the host left, the link was lost) and the guest's game is back at its
+    main menu, the game begins anew once more by itself — a couple of seconds — now on the player's own save:
+    in a session a guest plays on the host's save, afterwards the game is the player's own again.
+  - The fallback. If the memory cannot be kept or put back — with `[video] mode = game` (the game's own
+    exclusive full screen), or when the video device was lost and reset after the game had started (the
+    screen was locked, for example) — the mod does what 0.2.0 did: the game starts again as a new process. A
+    game that takes this path and games that begin in place play together.
+  - If the games did not find each other («ИГРОКИ НЕ ПОДКЛЮЧИЛИСЬ»), the game goes on to its main menu by
+    itself and stays its player's own game, on the player's own save: before, it stayed at the "press Enter"
+    screen as a session's game with no players.
+- **Players' names over their fighters.** In a network game the tag over a human's fighter — the game's own
+  arrow in the player's colour, which says 1P – 4P in the original — shows the player's name, in РУКОПАШНЫЙ
+  БОЙ (Melee) and in ИСТОРИЯ (Story) alike. The name is the player's Steam name. Without Steam (a game by
+  address with Steam not running) it is `[net] name` of `meleenet.ini`, if the player wrote a name there by
+  hand (Cyrillic works), else «ИГРОК N» (player N) by the player's number. The launcher has no row for the
+  name. Names with digits show a real 4 and 6.
+- **The story together, further.** The partners now fight in the training matches with the mecha turtle (in
+  0.2.0 these were for the hero alone) and in the matches where an enemy comes back as another one — the last
+  stage of Leonardo, Raphael, Donatello and Casey (Shredder, then the golden Shredder). A story can be played
+  together to its end. Still for the hero alone: the bomb match and the other mini-games (they run in a mode
+  of their own, made for one fighter) and matches that already use all eight places.
+- The game no longer resets its video device in its very first frame: RenderWare did that to switch "wait for
+  the monitor" on, and a window's device has no such setting.
+- `[net] name` in `meleenet.ini` is now a fallback name, for when Steam is not running: in UTF-8 or in
+  Windows' own code page, 31 bytes at most ([Settings](SETTINGS.md#net)).
+
+Launcher 1.3.0:
+
+- It carries the mod 0.3.0. The note under the rows of the tab СЕТЬ (network) tells of the name: «Над вашим
+  бойцом — ваш ник из Steam» (over your fighter is your Steam name). Nothing else changed in the launcher.
+- The button «Журнал до сессии» (the log before the session) still opens `meleenet-menu.log`. That file now
+  appears only when a session had to start a new process (the fallback): when a session began inside the
+  running game, everything is in `meleenet.log`.
+
+What exactly was checked in the lab:
+
+- Beginning inside the running game: sessions of two, three and four copies through the network page (by
+  address and through the stand-in for Steam), with antialiasing on and off. A session begun inside the running
+  game was compared line by line with a session of freshly started processes: the same frames.
+- The game's past: a copy that had played fights and the story and visited the library before the session
+  against a copy that had not — identical 4500 frames. Five returns to the start in a row after played fights:
+  the process's memory stays about 280 MB and does not grow. A 15000-frame session with two fights played out.
+- Coming in and coming back: a third copy comes into a running game; a guest loses its link, gets its own game
+  back and joins again — five times in a row.
+- The story: the last stage with three copies (the golden Shredder appears, the logs were identical), the
+  training with two.
+- Not checked: a real game with sound audible (the lab runs muted) and a lost video device.
 
 ## 0.2.0
 

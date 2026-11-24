@@ -16,7 +16,10 @@ COPIES = ["test-mm", "test-mmb", "test-mmc", "test-mmd"]
 
 def sim_lines(copy):
     p = os.path.join(copy, "meleenet-sim.log")
-    return open(p, encoding="latin1").read().splitlines() if os.path.exists(p) else []
+    lines = open(p, encoding="latin1").read().splitlines() if os.path.exists(p) else []
+    # (a session that began inside a running game: its frames come after the last "EPOCH" mark)
+    marks = [i for i, l in enumerate(lines) if l.startswith("EPOCH")]
+    return lines[marks[-1] + 1:] if marks else lines
 
 
 def compare(copies, show=4):

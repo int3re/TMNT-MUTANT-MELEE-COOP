@@ -142,6 +142,11 @@ void mute_process() {
 
 }  // namespace
 
+void on_boot() {
+  g_busy_until = 0;
+  g_seed = 1;
+}
+
 void on_epoch(uint32_t seed) {
   g_busy_until = 0;
   g_seed = seed ^ 0x564F4943;

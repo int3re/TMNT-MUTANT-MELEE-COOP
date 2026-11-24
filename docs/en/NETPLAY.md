@@ -46,8 +46,8 @@ over the network: the other players fight on the hero's side — see [The story 
      Enter again; then choose **ВОЙТИ ПО АДРЕСУ** (Join by address). The host sees their own address at
      the bottom of the screen: «АДРЕС ДЛЯ ДРУЗЕЙ: …» (address for friends).
 4. When everybody is in the list, **the host** chooses **НАЧАТЬ ИГРУ** (Start the game; the highlight goes
-   to this row by itself as soon as a second player is in). Everybody's game closes and opens again a few
-   seconds later — in the common game, straight in the main menu.
+   to this row by itself as soon as a second player is in). No window is closed: everybody's game goes through
+   its start-up again in a couple of seconds — and all are in the main menu of the common game.
 5. From there the game goes on as usual. In the main menu any player may choose; in РУКОПАШНЫЙ БОЙ each
    player picks their own hero, in ИСТОРИЯ the other players fight beside the hero.
 
@@ -80,16 +80,40 @@ gives the font a real 4 and 6, so an address and the places' numbers read as the
 Who sees a game opened over Steam — the host's friends, or everybody who has the mod — is chosen
 beforehand, in the launcher: СЕТЬ (Network) → «Видят в Steam» (Seen in Steam).
 
-### A network game begins with a restart
+### A network game begins inside the running game
 
-After **НАЧАТЬ ИГРУ** each game closes and starts again — for the common game. The logos and the "press
-Enter" screen pass by themselves, fast, and a few seconds later everybody is in the common main menu. It is
-done this way because a game in which something has already been played and a game that has just started
-do not behave alike; after the restart all the games are the same from the first frame.
+After **НАЧАТЬ ИГРУ** nothing is closed. The picture goes through the game's start-up again in a couple of
+seconds — eight times as fast as usual, with no logos to sit through, and the "press Enter" screen passes by
+itself — and everybody is in the main menu of the common game. The window, the video device and Steam stay as
+they are.
 
-The games that started again wait for each other for up to 45 seconds. If a guest has not found the host in
+Before version 0.3.0 each game closed and started again for this. The reason is the same as then: a game in
+which something has already been played and a game that has just started do not behave alike. Now the mod
+keeps a copy of the game's memory at the very beginning of its start-up, and to begin a network game it puts
+that copy back: everybody's game is a just started one again and the same from the first frame — without a new
+process.
+
+The games that began anew wait for each other for up to 45 seconds. If a guest has not found the host in
 that time, or nobody has come to the host, the top of the screen says «ИГРОКИ НЕ ПОДКЛЮЧИЛИСЬ. СЕТЕВАЯ ИГРА
-НЕ НАЧАЛАСЬ» (the players did not connect; the network game did not start): close the game and begin again.
+НЕ НАЧАЛАСЬ» (the players did not connect; the network game did not start), and the game goes on to its
+main menu by itself — your own game again, on your own save. Begin the network game again.
+
+Checked in the lab: sessions of two, three and four copies begun this way through the network page — by
+address and through the stand-in for Steam, with antialiasing on and off; such a session was compared line by
+line with a session of freshly started processes — the same frames. Not checked by a real game with sound
+audible: the lab runs muted.
+
+### The fallback: the game starts again
+
+In two cases the game's memory cannot be kept or put back, and the mod does what version 0.2.0 did: after
+**НАЧАТЬ ИГРУ** the game closes and opens again a few seconds later, as a new process — in the common game.
+
+- `meleenet.ini` has `[video] mode = game` — the game's own exclusive full screen ([Settings](SETTINGS.md)).
+- The video device was lost and reset after the game had started — the screen was locked, for example.
+
+This happens at the player whose game it is; the others' windows are not closed. A game that takes this path
+and games that begin in place play together. The log of the game that ran before the restart stays in
+`meleenet-menu.log`. A lost video device was not checked in the lab.
 
 ### Coming into a game that is being played
 
@@ -104,10 +128,10 @@ The host's game stays open while it is played: a player can join after НАЧА�
    fight is going on at that moment, the host sees «НОВЫЙ ИГРОК ЖДЕТ: ОН ВОЙДЕТ ПОСЛЕ БОЯ» (a new player
    waits: they come in after the fight) at the top of the frame.
 3. As soon as the session is between two fights — in the main menu, at the choice of a hero, of an arena or
-   of a fight's options, at the story's choice of a hero or on its map — every game, the newcomer's too,
-   closes and starts again into a session of all of them, exactly as at the first start. A fight is not
-   interrupted for it.
-4. After that start everybody is in the main menu. A story goes on from what the host's save holds.
+   of a fight's options, at the story's choice of a hero or on its map — everybody's game, the newcomer's too,
+   begins anew into a session of all of them, exactly as at the first start: in place, with no window closed.
+   A fight is not interrupted for it.
+4. A couple of seconds later everybody is in the main menu. A story goes on from what the host's save holds.
 
 What else to know:
 
@@ -123,15 +147,42 @@ What else to know:
   [below](#when-something-goes-wrong-on-the-way).
 
 Checked in the lab: a third copy knocks during a fight of two — by address and through the stand-in for
-Steam — and is in the game after the fight; the logs of the new session were identical frame by frame. Not
-checked on real Steam.
+Steam — and is in the game after the fight; the logs of the new session were identical frame by frame. In
+version 0.3.0 the same with no windows closing: a third copy comes into a running game; a guest loses its
+link, gets its own game back and joins again — five times in a row. Not checked on real Steam.
+
+## Names over the fighters
+
+<p align="center">
+  <img src="../images/game-names.png" alt="A fight of four players: a player's name over every fighter" width="820"><br>
+  <sub>A fight of four players: over every fighter is the player's name, in that player's colour. The names in
+  the picture are the lab's.</sub>
+</p>
+
+In the game itself a human's fighter has a tag over it: an arrow in the player's colour and the words 1P – 4P.
+In a network game **the player's name** is in the place of those words, in РУКОПАШНЫЙ БОЙ and in ИСТОРИЯ
+alike.
+
+- **The name is the player's Steam name.** Steam is asked even when the game itself goes by address: it is
+  enough that Steam is running (with `[net] transport = enet` the mod does not turn to Steam at all).
+- **Without Steam** (a game by address, Steam not running) the name is taken from the line `name` of the
+  section `[net]` in `meleenet.ini`, if the player wrote a name there by hand; Cyrillic works. The launcher
+  has no such row: the note under the rows of its tab СЕТЬ (Network) says «Над вашим бойцом — ваш ник из
+  Steam» (over your fighter is your Steam name).
+- **With neither**, the tag says «ИГРОК N» (player N) by the player's number: «ИГРОК 2».
+- A name is written in capitals, in the game's own font: Latin and Cyrillic letters, digits and a few
+  punctuation marks; any other character becomes "?". The tag holds the first 16 characters of a name. Names
+  with digits show a real 4 and 6.
+
+More about the line `name`: [Settings](SETTINGS.md#net).
 
 ## The story together
 
 <p align="center">
   <img src="../images/game-story.png" alt="A team match of the story in a network game of three players" width="820"><br>
   <sub>A team match of the story in a game of three players: Leonardo is the hero, Raphael and Donatello are
-  partners, Splinter is the friend the game's own script gives; against them, three Foot soldiers.</sub>
+  partners, Splinter is the friend the game's own script gives; against them, three Foot soldiers. Over the
+  players' fighters are their names.</sub>
 </p>
 
 In a network game **ИСТОРИЯ** (Story) is for everybody.
@@ -156,22 +207,29 @@ In a network game **ИСТОРИЯ** (Story) is for everybody.
 - **In the other match types** the story's own rules stay as written: where the hero's knock-out ends a
   match, it still does, partners or not.
 
+### The matches the partners fight in
+
+Since version 0.3.0 — nearly all of them, so a story can be played together to its end:
+
+- the ordinary matches — duels and team matches, as in 0.2.0;
+- the training matches with the mecha turtle (in 0.2.0 they were for the hero alone);
+- the matches where an enemy comes back as another one — the last stage of Leonardo, Raphael, Donatello and
+  Casey: Shredder, then the golden Shredder (in 0.2.0 they were for the hero alone too).
+
 ### Matches that stay for the hero alone
 
 In these matches the partners watch: their fighters are not in.
 
-- the training matches with the mecha turtle;
-- the bomb match and the other mini-games;
-- the four matches where an enemy comes back as another one — the last stages of Leonardo, Raphael,
-  Donatello and Casey (Shredder);
+- the bomb match and the other mini-games: they run in a mode of the game's own, made for one fighter;
 - matches that already use all eight places. If fewer places are free than there are partners, the partners
   with the lower numbers get them.
 
 ### What has been checked
 
 In the lab, on two and three copies: a duel stage (won; the hero down and the partner wins; everybody down —
-lost, then the rematch) and a team stage with a friend from the game's script (three players). The copies'
-logs were identical frame by frame. **Not checked:** every stage of every hero, a real game.
+lost, then the rematch) and a team stage with a friend from the game's script (three players). In version
+0.3.0: the last stage with three copies — the golden Shredder appears — and the training with two. The
+copies' logs were identical frame by frame. **Not checked:** every stage of every hero, a real game.
 
 ## In a network game
 
@@ -183,8 +241,12 @@ logs were identical frame by frame. **Not checked:** every stage of every hero, 
 - **While a network game is on there is no СЕТЕВАЯ ИГРА item in the menu**: its place says «В СЕТИ: ИГРОКОВ
   …» (online: … players). When the network game is over for you — everybody has left, or the link to the
   host is lost — the item is back: another game can be opened or joined from the same running game.
+- **Names over the fighters.** Over every player's fighter is that player's name, the Steam name
+  ([Names over the fighters](#names-over-the-fighters)).
 - **The save is the host's.** The heroes and arenas that are unlocked are theirs; for the network game the
-  guests get a copy of the host's save (`tmnt-net.sv`). A guest's own save, `tmnt.sv`, is not touched.
+  guests get a copy of the host's save (`tmnt-net.sv`). A guest's own save, `tmnt.sv`, is not touched. When
+  the network game is over for a guest and the guest's game is back at its main menu, the game begins anew
+  once more by itself — a couple of seconds — now on the guest's own save.
 - **The pause is anybody's.** Esc of any player pauses the fight for everybody; any player's Esc or Enter
   goes on with it. The pause menu's second row — leave the fight — stays with the player who leads the
   menus (the one who chose the fight in the main menu): while the highlight is on that row, the others' Esc
@@ -211,17 +273,20 @@ logs were identical frame by frame. **Not checked:** every stage of every hero, 
 - **A guest has closed the game, or nothing is heard from them for 15 seconds** — the others see «ИГРОК …
   ВЫШЕЛ ИЗ ИГРЫ» (player … has left the game) and play on; the hero of the one who left gets no more
   controls. This is what the code says.
-- **A guest who left can come back.** For them the session is over and СЕТЕВАЯ ИГРА is in their main menu
-  again: they join the host as a newcomer
+- **A guest who left can come back.** For them the session is over. When their game is back at its main
+  menu, it begins anew by itself — a couple of seconds, the window is not closed — now on their own save, and
+  СЕТЕВАЯ ИГРА is in the main menu again: they join the host as a newcomer
   ([Coming into a game that is being played](#coming-into-a-game-that-is-being-played)) and are in the game
   between two fights. If that was the only guest, the network game is over for the host too: the host
-  chooses СЕТЕВАЯ ИГРА → СОЗДАТЬ ИГРУ again. Checked in the lab: a guest came back after its link was lost
-  for good.
+  chooses СЕТЕВАЯ ИГРА → СОЗДАТЬ ИГРУ again. Checked in the lab: a guest loses its link for good, gets its
+  own game back and joins again — five times in a row.
 - **The host has closed the game, or the connection to them is lost for 15 seconds** — the network game is
   over. The guests see «СВЯЗЬ С ХОСТОМ ПОТЕРЯНА. ДАЛЬШЕ ВЫ ИГРАЕТЕ ОДИН» (the connection to the host is
   lost; you play on alone), and each goes on by themselves. A host whom all the guests have left sees
   «СЕТЕВАЯ ИГРА ОКОНЧЕНА» (the network game is over). After that the game frees its port and its place on
-  Steam: a new network game can be opened or joined without closing the game.
+  Steam: a new network game can be opened or joined without closing the game. A guest's game, once back at
+  its main menu, begins anew by itself — on the guest's own save: in the session the guest played on the
+  host's.
 - **«ИГРЫ РАЗОШЛИСЬ. НАЧНИТЕ СЕТЕВУЮ ИГРУ ЗАНОВО»** (the games have parted; start the network game again) —
   the games on different computers no longer match. Start the network game again and keep `meleenet.log` of
   every player ([If something is wrong](TROUBLESHOOTING.md)).
@@ -236,18 +301,23 @@ the **input delay** (1 to 12 frames, 2 by default; the host's value is the one i
 smoother on a poor connection, less is more responsive.
 
 This is also why a new player does not come straight into a fight. A game that has already played keeps
-things of it, and two games with different pasts part; only a common fresh start makes them the same.
-Between two fights every game starts again — now with the new player in.
+things of it, and two games with different pasts part; only a common beginning — the state of a game that has
+just started — makes them the same. Between two fights everybody's game goes back to that state, now with
+the new player in: the mod puts back the copy of the memory it kept at the very beginning of the game's
+start-up. No new process is needed for it
+([how it works](ARCHITECTURE.md#the-game-begins-anew-without-a-new-process)).
 
 ## Versions that play together
 
 | Versions of the mod | Network protocol | Play together |
 |---|---|---|
+| 0.3.0 | 3 | with 0.3.0 only |
 | 0.2.0 | 2 | with 0.2.0 only |
 | 0.1.0 – 0.1.1 | 1 | with each other — yes |
 
-Version 0.2.0 does not play with versions 0.1.x: the protocol is another one, and every player has to
-update. The host refuses a guest with another version, and the guest reads why at the bottom of the screen.
+Version 0.3.0 does not play with versions 0.2.0 and 0.1.x, nor 0.2.0 with 0.1.x: the protocol is another one,
+and every player has to update. The host refuses a guest with another version, and the guest reads why at the
+bottom of the screen.
 
 Version 0.1.1 with version 0.1.0 was checked in the lab: a network game with 0.1.1 as the host and 0.1.0 as
 the guest stayed the same on both for 2500 frames, a fight included.
@@ -259,5 +329,12 @@ the guest stayed the same on both for 2500 frames, a fight included.
   with frames of different shapes; the story together on two and three copies
   ([what exactly](#what-has-been-checked)); a third copy coming into a running game and a guest coming back
   after a lost link; a guest's pause and the leader leaving the fight; frame skipping on one copy of two.
+- Checked in the lab in version 0.3.0: sessions of two, three and four copies begun inside the running game —
+  and such a session against a session of freshly started processes (the same frames); a copy that had played
+  fights and the story and visited the library before the session against a copy that had not (identical 4500
+  frames); five returns to the start in a row after played fights (the process's memory stays about 280 MB
+  and does not grow); a 15000-frame session with two fights played out; a guest loses its link, gets its own
+  game back and joins again — five times in a row.
 - **Not checked by a real game:** Steam on real accounts; the game's real window in front — the keyboard,
-  the mouse's buttons, typing an address; gamepads; long sessions; every stage of the story.
+  the mouse's buttons, typing an address; gamepads; sound after the game's return to its start (the lab runs
+  muted); every stage of the story. A lost video device was not checked in the lab either.

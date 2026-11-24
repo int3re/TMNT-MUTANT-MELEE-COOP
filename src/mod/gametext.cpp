@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "common/log.h"
+#include "mod/digits.h"
 #include "mod/game.h"
 
 namespace gametext {
@@ -89,6 +90,9 @@ std::wstring say(const std::wstring& text) {
     if (c == 0x0451 || c == 0x0401) c = 0x0415;                           // Ё -> Е
     if (c >= 0x0410 && c <= 0x042F) {
       out += g_russian ? kCipher[c - 0x0410] : L'?';
+    } else if ((c == L'4' || c == L'6') && digits::ready()) {
+      // (a digit the text really has: the font's own 4 and 6 are the letters Ч and Б in this release)
+      out += c == L'4' ? digits::kFour : digits::kSix;
     } else if ((c >= L'A' && c <= L'Z') || (c >= L'0' && c <= L'9') || wcschr(L" !?'+./:;-()\n,", c)) {
       out += c;
     } else if (c == L'_') {

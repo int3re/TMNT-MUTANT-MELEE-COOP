@@ -13,7 +13,9 @@
 #include "mod/input.h"
 #include "mod/netplay.h"
 #include "mod/notice.h"
+#include "mod/menu.h"
 #include "mod/patch.h"
+#include "mod/rewind.h"
 #include "mod/sound.h"
 #include "mod/story.h"
 #include "mod/video.h"
@@ -52,6 +54,7 @@ const char kFirstMode[] = "TtMemCardBootCheckMode";
 uint32_t g_epoch_seed = 0;
 uint32_t g_epochs = 0;
 bool g_menu_seen = false;  // the main menu has been entered once: the start-up is over
+bool g_quick_boot = false; // the start-up is being played again inside the running game (no logos, eight times as fast)
 
 // A pass of the system update is a game frame when it ends a frame whose mode was updated. The others
 // are pictures only: the game's second thread draws the loading screen while a level loads (as many
@@ -60,7 +63,7 @@ bool is_tick() { return g_update_thread.load() == GetCurrentThreadId() && g_in_m
 
 // A game started for a session runs its start-up (the logos, the "press Enter" screen) eight times as
 // fast and without the pace of 60 frames a second: every game of the session does, so they stay the same.
-bool quick_start() { return netplay::session_game() && !g_menu_seen; }
+bool quick_start() { return (netplay::session_game() || g_quick_boot) && !g_menu_seen; }
 
 // Frames are held at 60 a second.
 void pace() {
@@ -98,9 +101,13 @@ void __cdecl hkClockStep() {
   ++*reinterpret_cast<int*>(game::kFrameCount);
 }
 
+std::atomic<int> g_background_frames{0};  // the loading thread is inside the game's frame
+
 void __cdecl hkFrame(char update) {
   if (!update) {
+    ++g_background_frames;
     oFrame(update);
+    --g_background_frames;
     return;
   }
   DWORD before = g_update_thread.exchange(GetCurrentThreadId());
@@ -220,6 +227,7 @@ Since_t oSince = nullptr;
 
 // (microseconds; a start-up frame of a session game counts for eight)
 std::atomic<LONGLONG> g_frame_time{0};
+LONGLONG g_frame_time_kept = 0;  // at the game's first mode, with the kept memory
 LONGLONG frame_time() { return g_frame_time.load(); }
 
 void __cdecl hkStamp(LARGE_INTEGER* out) { out->QuadPart = frame_time(); }
@@ -312,28 +320,50 @@ bool g_met = false;
 void on_enter(void* mode) {
   if (g_cfg.mode_log) LOGI("game: enters %s (frame %u)", class_name(mode), g_tick.load());
   if (!g_met) {
-    // The game's very first mode: a game started for a session meets the other players before it.
+    // The game's very first mode. The game's memory is kept as it is now - a process that has just started -
+    // to be put back whenever the game is to begin anew; a game started for a session meets the other
+    // players before the mode.
     g_met = true;
+    anew::capture();
+    g_frame_time_kept = g_frame_time.load();
     netplay::meet();
     g_next.QuadPart = 0;
   }
-  if (strcmp(class_name(mode), "TtGameStartMode") == 0) g_menu_seen = true;
+  if (strcmp(class_name(mode), "TtGameStartMode") == 0) {
+    g_menu_seen = true;
+    g_quick_boot = false;
+  }
   if (!g_epoch_pending || strcmp(class_name(mode), g_epoch_boot ? kFirstMode : "TtGameStartMode") != 0) return;
   g_epoch_pending = false;
+  bool rewound = false;
   if (g_epoch_boot) {
     g_menu_seen = false;
+    g_quick_boot = true;
     // (the lab's two copies have no host to take a save from: both begin without one)
     if (g_cfg.lab_epoch) DeleteFileW((module_dir() + L"tmnt.sv").c_str());
+    rewound = anew::restore();
+    if (rewound) g_frame_time = g_frame_time_kept;
+    menu::reset();
+    story::reset();
   }
-  if (!g_cfg.lab_keep_modes) restore_modes();
-  *reinterpret_cast<float*>(game::kElapsedTime) = 0.0f;
-  reseed(g_epoch_seed);
-  sound::on_epoch(g_epoch_seed);
+  if (rewound) {
+    // (the game is a just started process again: its clock, its random numbers, its modes are that process's)
+    sound::on_boot();
+  } else {
+    if (!g_cfg.lab_keep_modes) restore_modes();
+    *reinterpret_cast<float*>(game::kElapsedTime) = 0.0f;
+    reseed(g_epoch_seed);
+    sound::on_epoch(g_epoch_seed);
+  }
   g_epoch_tick = g_tick.load();
   ++g_epochs;
-  LOGI("sim: epoch %u at frame %u (seed %08X): %s begins anew", g_epochs, g_epoch_tick, g_epoch_seed,
-       g_epoch_boot ? "the game" : "the main menu");
+  LOGI("sim: epoch %u at frame %u (seed %08X): %s begins anew%s", g_epochs, g_epoch_tick, g_epoch_seed,
+       g_epoch_boot ? "the game" : "the main menu", rewound ? ", its memory put back" : "");
   if (g_log) fprintf(g_log, "EPOCH %u\n", g_epochs);
+  if (g_epoch_boot) {
+    netplay::meet();  // (a session that begins here: the players meet before the first mode, as in a new process)
+    g_next.QuadPart = 0;
+  }
   if (g_on_epoch) g_on_epoch();
 }
 
@@ -365,6 +395,9 @@ void __cdecl hkReadDevices() {
   if (g_cfg.lab_epoch && !g_epochs && !g_epoch_pending && t >= g_cfg.lab_epoch_at &&
       strcmp(mode_name(), "TtGameStartMode") == 0)
     request_epoch(0x4D454C45, nullptr, g_cfg.lab_epoch_boot);
+  if (g_cfg.lab_epoch && g_cfg.lab_epoch_again && g_epochs && !g_epoch_pending && since_epoch() >= g_cfg.lab_epoch_again &&
+      strcmp(mode_name(), "TtGameStartMode") == 0)
+    request_epoch(0x4D454C45, nullptr, g_cfg.lab_epoch_boot);
   bool lab_waits = g_cfg.lab_epoch && !g_epochs;
   uint32_t lf = lab_waits ? 0 : since_epoch();  // the frame as the lab counts it
   if (g_epoch_pending) {
@@ -372,6 +405,9 @@ void __cdecl hkReadDevices() {
     for (int pl = 0; pl < game::kPlayers; ++pl) input::write(pl, input::Pad{});
   } else if (!netplay::frame(since_epoch())) {
     input::apply_script(lab_waits ? t : lf, lab_waits);
+    // (a start-up played again with nobody in a session: its "press Enter" screen is pressed by the mod)
+    if (g_quick_boot && !g_menu_seen && since_epoch() % 20 == 0 && strcmp(mode_name(), "TtTitleScreenMode") == 0)
+      input::press(0, game::kEnter);
   }
   if (g_cfg.lab_story_open || g_cfg.lab_ko_enemies || g_cfg.lab_ko_hero || g_cfg.lab_ko_partners) story::lab_frame(lf);
   if (g_cfg.lab_desync_at && lf == g_cfg.lab_desync_at) reinterpret_cast<uint32_t(__cdecl*)()>(game::kRpRandom)();
@@ -386,7 +422,7 @@ void __cdecl hkReadDevices() {
             *reinterpret_cast<const float*>(game::kElapsedTime));
   }
   g_rng_calls = 0;
-  if ((g_cfg.autoquit_frame && lf >= g_cfg.autoquit_frame && (!g_cfg.lab_page || (netplay::session_game() && netplay::players() >= g_cfg.lab_autoquit_players))) ||
+  if ((g_cfg.autoquit_frame && lf >= g_cfg.autoquit_frame && (!g_cfg.lab_page || (netplay::session_game() && !g_epoch_pending && netplay::players() >= g_cfg.lab_autoquit_players))) ||
       (g_cfg.autoquit_s && GetTickCount() - g_started_tick >= static_cast<DWORD>(g_cfg.autoquit_s) * 1000)) {
     LOGI("debug: autoquit at frame %u", t);
     flush();
@@ -399,7 +435,11 @@ void __cdecl hkReadDevices() {
 
 uint32_t frame() { return g_tick.load(); }
 unsigned pictures_skipped() { return g_skipped.load(); }
+int background_frames() { return g_background_frames.load(); }
 uint32_t since_epoch() { return g_tick.load() - g_epoch_tick; }
+void hurry_boot() {
+  if (!g_menu_seen) g_quick_boot = true;
+}
 uint32_t epochs() { return g_epochs; }
 bool epoch_pending() { return g_epoch_pending; }
 

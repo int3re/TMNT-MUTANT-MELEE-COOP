@@ -67,8 +67,8 @@ What appears later, by itself:
 
 | File | What it is |
 |---|---|
-| `meleenet.log` | the log of the game's last run |
-| `meleenet-menu.log` | the log of the game a network game was started from (before it started again) |
+| `meleenet.log` | the log of the game's last run; a network game begun inside the running game is in it too |
+| `meleenet-menu.log` | the log of the game a network game was started from — before it started again. Since version 0.3.0 it appears only when a network game started as a new process ([the fallback](NETPLAY.md#the-fallback-the-game-starts-again)) |
 | `tmnt-net.sv` | at a guest of a network game: a copy of the host's save. Your own save, `tmnt.sv`, is not touched |
 
 The keys you change in the launcher are written into the game's own file of bindings, `tmntwire.hks`

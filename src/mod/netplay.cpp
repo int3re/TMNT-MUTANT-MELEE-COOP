@@ -26,6 +26,7 @@
 #include "mod/netlobby.h"
 #include "mod/notice.h"
 #include "mod/patch.h"
+#include "mod/rewind.h"
 #include "mod/sim.h"
 
 namespace netplay {
@@ -137,7 +138,9 @@ bool send(const PeerId& peer, const T& packet, Channel ch) {
 
 void copy_name(char* to, size_t n, const std::string& s) {
   memset(to, 0, n);
-  memcpy(to, s.data(), s.size() < n - 1 ? s.size() : n - 1);
+  size_t len = s.size() < n - 1 ? s.size() : n - 1;
+  while (len > 0 && len < s.size() && (static_cast<unsigned char>(s[len]) & 0xC0) == 0x80) --len;  // not inside a UTF-8 letter
+  memcpy(to, s.data(), len);
 }
 
 int player_of(const PeerId& peer) {
@@ -212,10 +215,13 @@ bool lab_drops() {
     const std::wstring mark = module_dir() + L"lab-outage.done";
     if (done < 0) done = g_cfg.net_outage_once && GetFileAttributesW(mark.c_str()) != INVALID_FILE_ATTRIBUTES ? 1 : 0;
     uint32_t t = net::now_ms() - g_started_ms;
+    static bool begun = false;
     if (!done && t >= g_cfg.net_outage_at_ms && t < g_cfg.net_outage_at_ms + g_cfg.net_outage_ms) {
       if (g_cfg.net_outage_once) CloseHandle(CreateFileW(mark.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, 0, nullptr));
+      begun = true;
       return true;
     }
+    if (begun && g_cfg.net_outage_once) done = 1;  // (the same process may play another session)
   }
   if (!g_cfg.net_loss) return false;
   static uint32_t seed = GetTickCount() | 1;
@@ -244,13 +250,14 @@ std::vector<uint8_t> read_file(const std::wstring& path, bool& exists) {
 }
 
 // A guest's game reads and writes tmnt-net.sv where the game says tmnt.sv: its own save is never touched.
-void use_session_save() {
+void use_session_save(bool on) {
   static const uintptr_t sites[] = {game::kSaveName1, game::kSaveName2, game::kSaveName3, game::kSaveName4};
-  uint32_t old_name = static_cast<uint32_t>(game::kSaveNameText);
+  uint32_t games = static_cast<uint32_t>(game::kSaveNameText);
   uint32_t mine = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(g_save_name));
+  uint32_t want = on ? mine : games, other = on ? games : mine;
   int done = 0;
   for (uintptr_t site : sites)
-    if (patch::bytes_are(site, &old_name, 4) && patch::write(site, &mine, 4)) ++done;
+    if (patch::bytes_are(site, &want, 4) || (patch::bytes_are(site, &other, 4) && patch::write(site, &want, 4))) ++done;
   if (done != 4) LOGE("net: the game's save file name is not where it should be (%d of 4 places)", done);
 }
 
@@ -570,7 +577,14 @@ void give_the_word() {
 }
 
 // The word was given a moment ago (the answers have left): this game starts itself again.
-bool again_due() { return g_again_ms && net::now_ms() - g_again_ms >= (g_host ? 1500u : 400u); }
+bool again_due() {
+  if (!g_again_ms) return false;
+  // A new process takes seconds to come up, so the guests go first and the host a moment later. Inside the
+  // running game it is the other way round: the host must have closed its old port and opened the new one
+  // before a guest dials it.
+  uint32_t after = in_place() ? (g_host ? 300u : 1500u) : (g_host ? 1500u : 400u);
+  return net::now_ms() - g_again_ms >= after;
+}
 
 void start_again() {
   bool host = g_host;
@@ -670,6 +684,22 @@ bool over_steam() {
   return g_cfg.net_transport == "steam" || g_cfg.net_transport == "mock";
 }
 
+// This player's name for the others: the Steam name (Steam is asked even when the session itself goes by
+// address). Without Steam: [net] name of meleenet.ini if the player wrote one there, else "player" (shown
+// as "player N" on the tags).
+std::string my_name() {
+  static bool asked = false;
+  if (!steam::ready() && !asked && g_cfg.net_transport != "enet") {
+    asked = true;
+    steam::boot(g_cfg);
+  }
+  if (steam::ready()) {
+    std::string n = steam::my_name();
+    if (!n.empty()) return n;
+  }
+  return g_cfg.net_name.empty() ? "player" : g_cfg.net_name;
+}
+
 // The host listens both ways when it can: Steam for friends, a UDP port for an address.
 bool meet_host() {
   uint16_t port = static_cast<uint16_t>(g_cfg.net_port);
@@ -702,7 +732,7 @@ bool meet_host() {
   LOGI("net: hosting%s%s; waiting for %d player(s) (up to %d s)", ts ? " over Steam" : "", te ? " on a UDP port" : "", want - 1,
        g_cfg.net_wait_s);
   g_t = std::make_unique<transport::MultiTransport>(std::move(ts), std::move(te));
-  g_names[0] = g_cfg.net_name;
+  g_names[0] = my_name();
   int in = 1;
   uint32_t t0 = net::now_ms();
   while (in < want && net::now_ms() - t0 < static_cast<uint32_t>(g_cfg.net_wait_s) * 1000) {
@@ -816,7 +846,7 @@ bool meet_guest() {
     memcpy(hello.exe_hash, g_exe_hash, 8);
     memcpy(hello.data_hash, g_data_hash, 8);
     copy_name(hello.mod_version, sizeof(hello.mod_version), MELEENET_VERSION);
-    copy_name(hello.name, sizeof(hello.name), g_cfg.net_name);
+    copy_name(hello.name, sizeof(hello.name), my_name());
     send(g_peer[0], hello, Channel::Control);
   };
   uint32_t t0 = net::now_ms();
@@ -967,15 +997,23 @@ void meet() {
   if (!sha256_file(module_dir() + L"archive.arc", data)) LOGW("net: archive.arc cannot be read");
   memcpy(g_data_hash, data, 8);
   net::startup();
-  g_first = sim::frame() + 1;
+  g_first = sim::since_epoch() + 1;
+  // (how many particles are made is drawn from the game's random numbers: the same on every PC of a session)
+  *reinterpret_cast<int*>(game::kParticlePercent) = 100;
   bool ok = g_cfg.net_mode == Config::Net::Host ? meet_host() : meet_guest();
   if (!ok) {
     if (g_t) g_t->Shutdown();
     g_t.reset();
-    g_phase = Phase::Ended;
+    // Nothing of a session has been played and this game is at its very start (a new process, or its memory
+    // just put back), before its save is read: it simply goes on as its player's own game, to the main menu.
+    g_phase = Phase::Off;
+    g_session_game = false;
     g_players = 1;
     g_me = 0;
+    use_session_save(false);
+    sim::hurry_boot();
     notice::say(L"ИГРОКИ НЕ ПОДКЛЮЧИЛИСЬ\nСЕТЕВАЯ ИГРА НЕ НАЧАЛАСЬ", 20);
+    LOGI("net: no session: this game goes on as its player's own");
     return;
   }
   uint32_t now = net::now_ms();
@@ -988,7 +1026,11 @@ void meet() {
     if (g_lobby) g_lobby->SetInGame(true);
   }
   g_keeper_on = true;
-  if (HANDLE t = CreateThread(nullptr, 0, keeper, nullptr, 0, nullptr)) CloseHandle(t);
+  static bool keeper_made = false;
+  if (!keeper_made) {
+    keeper_made = true;
+    if (HANDLE t = CreateThread(nullptr, 0, keeper, nullptr, 0, nullptr)) CloseHandle(t);
+  }
 }
 
 bool frame(uint32_t frame) {
@@ -1007,6 +1049,20 @@ bool frame(uint32_t frame) {
     }
   }
   if (g_phase == Phase::Playing && again_due()) start_again();
+  if (g_phase == Phase::Ended && g_session_game && in_place() && strcmp(sim::mode_name(), "TtGameStartMode") == 0 &&
+      !sim::epoch_pending()) {
+    // The session is over and the game is back at its main menu: this game is its player's own again.
+    // A guest played on the host's save: its game begins anew with its own.
+    bool guest = !g_host;
+    g_phase = Phase::Off;
+    g_session_game = false;
+    g_players = 1;
+    g_me = 0;
+    use_session_save(false);
+    LOGI("net: back to this player's own game%s", guest ? " (it begins anew, on the player's own save)" : "");
+    if (guest) sim::request_epoch(0, nullptr, true);
+    return false;
+  }
   if (g_phase == Phase::Ended && g_session_game) {
     // The session is over; this PC's player goes on with the pad it had.
     input::Pad mine = input::read_local(frame);
@@ -1168,6 +1224,56 @@ bool prepare(Config& cfg) {
   return true;
 }
 
+bool in_place() { return anew::ready() || g_cfg.lab_inplace; }
+
+void begin(bool host, const std::string& via, uint64_t peer, const std::string& join, int players) {
+  // (whatever is left of a session before this one)
+  g_keeper_on = false;
+  {
+    NetLock lock;
+    if (g_t) {
+      g_t->Shutdown();
+      g_t.reset();
+    }
+    g_lobby.reset();
+  }
+  g_cfg.net_mode = host ? Config::Net::Host : Config::Net::Join;
+  g_cfg.net_via = via;
+  g_cfg.net_peer = peer;
+  if (!join.empty()) g_cfg.net_connect = join;
+  g_cfg.net_players = players;
+  g_cfg.net_wait_s = 45;  // (the other games are beginning anew right now: they are there in seconds or not at all)
+  g_host = false;
+  g_me = 0;
+  g_players = 1;
+  g_delay = g_cfg.net_delay;
+  g_first = 1;
+  g_frame = 0;
+  for (int p = 0; p < kMax; ++p) {
+    g_names[p].clear();
+    g_peer[p] = PeerId{};
+    g_gone[p] = false;
+    g_last_rx[p] = 0;
+    g_pads[p].clear();
+    g_newest[p] = 0;
+    g_guest_has[p] = 0;
+    g_held[p] = input::Pad{};
+    g_hash_early[p].clear();
+  }
+  g_bundle = g_host_has = 0;
+  g_hash_mine.clear();
+  g_desync = false;
+  g_waited_ms = g_waits = 0;
+  g_waiting.clear();
+  g_again_ms = 0;
+  g_again = mmp::Go{};
+  g_phase = Phase::Meeting;
+  g_session_game = true;
+  use_session_save(!host);
+  LOGI("net: a session begins in this running game: %s over %s", host ? "this game hosts" : "this game joins", via.c_str());
+  sim::request_epoch(0, nullptr, true);
+}
+
 void install(const Config& cfg) {
   g_cfg = cfg;
   InitializeCriticalSection(&g_net_lock);
@@ -1176,7 +1282,7 @@ void install(const Config& cfg) {
     g_phase = Phase::Meeting;
     g_session_game = true;
     LOGI("net: %s", cfg.net_mode == Config::Net::Host ? "this game hosts" : "this game joins");
-    if (cfg.net_mode == Config::Net::Join) use_session_save();
+    if (cfg.net_mode == Config::Net::Join) use_session_save(true);
   }
 }
 

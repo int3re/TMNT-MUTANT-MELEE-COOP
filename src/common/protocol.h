@@ -12,7 +12,10 @@ constexpr uint32_t kMagic = 0x454C454D;  // bytes 'M','E','L','E'
 // 2 (meleenet 0.2.0): every player's Esc pauses a fight; pictures and particles take no random numbers of the
 //    rules; the story is played together; a player who has left is marked in the pads; a game that is being
 //    played lets players in (Knock / Lobby / Go between the games of a running session).
-constexpr uint16_t kVersion = 2;
+// 3 (meleenet 0.3.0): a session begins inside the running games (the same messages; a game that cannot do
+//    it still starts a new process and plays with the others); in the story partners fight in the training
+//    matches and in matches where an enemy has a second life.
+constexpr uint16_t kVersion = 3;
 constexpr uint16_t kDefaultPort = 47830;
 
 constexpr uint8_t kChannelControl = 0;  // reliable, ordered

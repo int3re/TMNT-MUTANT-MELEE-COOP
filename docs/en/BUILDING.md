@@ -168,11 +168,11 @@ game's files in them are hard links, and a copy has of its own only the settings
 | Script | What it does |
 |---|---|
 | `run_one.py <frames> "<script>" [key=value …]` | one copy with a script of presses; `--shots 300,600` saves pictures of those frames, `--sheet <file.png>` puts them on one sheet |
-| `run_twice.py <frames> "<script>"` | two copies play one and the same script at the same time: are their frame logs the same? The script's frames count from the main menu: the mod enters it anew with the clock and the random numbers reset. `--pre-b "<script>"` gives the second copy another history before that moment |
+| `run_twice.py <frames> "<script>"` | two copies play one and the same script at the same time: are their frame logs the same? The script's frames count from the main menu: the mod enters it anew with the clock and the random numbers reset. `--pre-b "<script>"` gives the second copy another history before that moment. With `epoch_boot=1` both copies are put back to their start instead — the way a session begins: `run_twice.py … epoch_boot=1 --pre-b "<script>"` compares a copy with a past against a fresh one |
 | `diverge.py` | after `run_twice.py`: where the copies parted and, if the run had `rng_trace`, the first random number that differs, with the addresses of those who drew it |
-| `run_net.py <frames> [--players N] [--p1 "<script>"] [--p2 …] [--via enet\|mock]` | a network game of two to four copies on one computer, by address or through the stand-in for Steam; each copy plays its own script as its own player; the logs of all copies are compared frame by frame |
-| `run_page.py <frames> [--players N] [--via addr\|mock]` | the whole way through the page СЕТЕВАЯ ИГРА (network game): the copies start as ordinary games, walk the menu, one opens a game, the others join, the host starts — and each game starts itself again, now in the network game |
-| `run_door.py <frames> [--via addr\|mock]` | a player comes into a session that is being played: copies 1 and 2 go through the network page into a session and start a fight; then copy 3 is started, walks its own menu and knocks at the host. It waits at the door until the first two leave the fight, and then all three games start themselves again into a session of three; `<frames>` is how many frames that last session plays, and its frame logs must be the same |
+| `run_net.py <frames> [--players N] [--p1 "<script>"] [--p2 …] [--via enet\|mock]` | a network game of two to four copies on one computer, by address or through the stand-in for Steam; each copy plays its own script as its own player; the logs of all copies are compared frame by frame. The copies here are freshly started processes that are a session from their start (`[net] mode = host \| join`) |
+| `run_page.py <frames> [--players N] [--via addr\|mock]` | the whole way through the page СЕТЕВАЯ ИГРА (network game): the copies start as ordinary games, walk the menu, one opens a game, the others join, the host starts — and the session begins in place, inside the same running games. `pN:key=value` is a `[debug]` key for copy N only; `--rawN "<lines>"` gives copy N script lines as they are; the environment variable `LAB_AA=4` turns antialiasing on for the copies |
+| `run_door.py <frames> [--via addr\|mock]` | a player comes into a session that is being played: copies 1 and 2 go through the network page into a session and start a fight; then copy 3 is started, walks its own menu and knocks at the host. It waits at the door until the first two leave the fight, and then all three games begin anew — in place — into a session of three; `<frames>` is how many frames that last session plays, and its frame logs must be the same |
 
 For example, one copy: 1500 frames, five presses of Enter, the picture of frame 1300 on a sheet:
 
@@ -191,15 +191,44 @@ line: `420 enter`, `600-640 right+attack`, `700 p2.jump`. The controls: `up`, `d
 `attack`, `alt`, `jump`, `action`, `special`, `block`, `esc`, `enter`, `back`, `start`, `space`, `f11`. A
 press without a range lasts four frames. The frames are game frames, not pictures on the screen.
 
+In a run through the network page one copy goes through several stretches, and a script line may begin with
+a word that says which of them it belongs to: `menu <line>` — the game before a session, `game <line>` — the
+game in a session, `solo <line>` — the game alone again after a session (it has begun anew for its own
+player). `run_page.py` and `run_door.py` put `menu` and `game` in themselves; `solo` lines are given through
+`--rawN`.
+
 The frame log is `meleenet-sim.log` in the copy's folder: a line for every game frame with its number, the
 game's mode, how many random numbers were drawn, a fingerprint of the state, a fingerprint of the pads and
-the game's time.
+the game's time. Every beginning anew is marked in it by a line `EPOCH <number>`. For a session begun in
+place the frames compared are those after the last `EPOCH` line: that is what `run_page.py` and
+`run_door.py` do.
 
 The lab's switches are the `[debug]` section of `meleenet.ini`; each is described in `src/mod/config.h` — a
 lossy and broken network, a stalled frame, a trace of the random numbers, pictures of frames, and more.
 `key=value` on the command line goes there too. In `run_one.py` and `run_net.py` a key with a section's
 name goes into that section: `net.delay=3` into `[net]`, `video.mode=window` into `[video]`; in
-`run_net.py`, `p2:net_loss=20` goes to the second copy only.
+`run_net.py` and `run_page.py`, `p2:net_loss=20` goes to the second copy only.
+
+The switches that came with version 0.3.0:
+
+| `[debug]` key | What it does |
+|---|---|
+| `inplace = 1` | a session begins inside the running game even when the game's memory is not kept: the start-up is only played again |
+| `no_rewind = 1` | the game's memory is not kept at the beginning of its start-up: a session starts as a new process, as in 0.2.0 |
+| `epoch_again = N` | with `epoch = 1`: the lab's epoch (with `epoch_boot = 1`, a return to the start) is repeated as soon as N game frames have passed since the last one and the game is in the main menu — a run of many returns in a row |
+
+For example, a session of four copies through the network page, begun in place, with antialiasing on in the
+copies:
+
+```bash
+LAB_AA=4 python tools/lab/run_page.py 3000 --players 4
+```
+
+A copy with a past against a fresh one, both put back to their start:
+
+```bash
+python tools/lab/run_twice.py 4500 "<script>" epoch_boot=1 --pre-b "<the past's script>"
+```
 
 The switches that came with version 0.2.0:
 

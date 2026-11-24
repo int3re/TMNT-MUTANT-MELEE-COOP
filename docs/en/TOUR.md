@@ -46,10 +46,14 @@ The digits in an address and in the places' numbers are real ones. The Russian r
 letters Ч and Б in the places of 4 and 6; the mod gives the menu font a real 4 and 6 — they show in a
 fight's clock and scores and in the options too. Words keep their Ч and Б.
 
+**After НАЧАТЬ ИГРУ no window is closed.** Everybody's game goes through its start-up again in a couple of
+seconds — in the same window, eight times as fast as usual — and all are in the main menu of the common game.
+Before version 0.3.0 every game closed and opened again for this.
+
 **A game that is already being played can be joined too.** Among friends' games on Steam it is marked «ИДЕТ
 ИГРА» (a game is going on). The new player waits on the page of the game — it says **ВОЙДЕТЕ ПОСЛЕ БОЯ** (you
-come in after the fight) — and between two fights every game starts again, now with the new player in. A
-player whose link was lost comes back the same way.
+come in after the fight) — and between two fights everybody's game begins anew, now with the new player in:
+with no windows closing either. A player whose link was lost comes back the same way.
 
 More: [Network play](NETPLAY.md).
 
@@ -69,6 +73,19 @@ network each computer is one of the four players, and each player picks their ow
 A fight of four players. Nothing of the picture is sent over the network: each game plays the fight itself,
 and only the players' presses travel. Any player's Esc pauses the fight — for everybody.
 
+### Names over the fighters
+
+<p align="center">
+  <img src="../images/game-names.png" alt="A fight of four players: a player's name over every fighter" width="820">
+</p>
+
+In the game itself a human's fighter has a tag over it: an arrow in the player's colour and the words 1P – 4P.
+In a network game the player's name is in the place of those words, in the same colour — in РУКОПАШНЫЙ БОЙ
+and in ИСТОРИЯ alike. The name is the player's Steam name; without Steam it is «ИГРОК N» (player N) by the
+player's number, or a name the player wrote into `meleenet.ini` by hand. The names in the picture are the
+lab's: LEO, RAPH, DON and MIKE are the names of the four players, not of the heroes they play. More:
+[Names over the fighters](NETPLAY.md#names-over-the-fighters).
+
 ### The story together
 
 <p align="center">
@@ -76,11 +93,13 @@ and only the players' presses travel. Any player's Esc pauses the fight — for 
 </p>
 
 A team match of the story in a game of three players: Leonardo is the hero, Raphael and Donatello are
-partners, Splinter is the friend the game's own script gives; against them, three Foot soldiers. In the game
-itself ИСТОРИЯ (Story) is made for one player. Over the network the player who chose it in the main menu
-leads it, and in every match the other players fight on the hero's side — each as a turtle by their player
-number. A few matches stay for the hero alone: the training with the mecha turtle, the mini-games, the
-matches where an enemy comes back as another one. More: [The story together](NETPLAY.md#the-story-together).
+partners, Splinter is the friend the game's own script gives; against them, three Foot soldiers. Over the
+players' fighters are their names. In the game itself ИСТОРИЯ (Story) is made for one player. Over the network
+the player who chose it in the main menu leads it, and in every match the other players fight on the hero's
+side — each as a turtle by their player number. Since version 0.3.0 the partners fight in the training with
+the mecha turtle and in the last stages, where an enemy comes back as another one (Shredder, then the golden
+Shredder): a story can be played together to its end. The mini-games and matches that already use all eight
+places stay for the hero alone. More: [The story together](NETPLAY.md#the-story-together).
 
 ### Wide screen: fights and menus
 
@@ -161,7 +180,8 @@ beside the title.
 </p>
 
 **ГРАФИКА** — the window, the resolution, the shape of the frame, the menus and the quality of the picture.
-**СЕТЬ** (Network) — the input delay, who sees a game opened over Steam, and the mouse's buttons.
+**СЕТЬ** (Network) — the input delay, who sees a game opened over Steam, and the mouse's buttons; the note
+under the rows reminds that in a network game your Steam name is over your fighter.
 
 <p align="center">
   <img src="../images/launcher-controls.png" alt="Keys and layouts" width="410">

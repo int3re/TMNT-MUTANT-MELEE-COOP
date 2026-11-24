@@ -11,6 +11,7 @@
 #include "mod/game.h"
 #include "mod/netplay.h"
 #include "mod/patch.h"
+#include "mod/sim.h"
 #include "mod/video.h"
 
 namespace input {
@@ -27,6 +28,8 @@ struct Press {
   int player;  // 0..3
   Pad pad;
   bool pre;    // "pre <frame> ...": frames of the run before the lab's epoch
+  int where;   // 0: any game; 1 "menu <line>": before any session; 2 "game <line>": in a session;
+               // 3 "solo <line>": alone again after a session (the game has begun anew for its own player)
 };
 std::vector<Press> g_script;
 
@@ -71,18 +74,22 @@ void load_script(const std::wstring& path) {
     if (pre) text += 4;
     // "menu <line>": only in a game that is not a session's; "game <line>": only in a session's game
     // (a run through the network page is two games of one copy, one after the other).
+    int where = 0;
     if (strncmp(text, "menu ", 5) == 0) {
-      if (netplay::session_game()) continue;
+      where = 1;
       text += 5;
     } else if (strncmp(text, "game ", 5) == 0) {
-      if (!netplay::session_game()) continue;
+      where = 2;
+      text += 5;
+    } else if (strncmp(text, "solo ", 5) == 0) {
+      where = 3;
       text += 5;
     }
     if (sscanf(text, "%u-%u %127s", &a, &b, what) != 3) {
       if (sscanf(text, "%u %127s", &a, what) != 2) continue;
       b = a + 3;  // a tap: four frames
     }
-    Press p{a, b, 0, {}, pre};
+    Press p{a, b, 0, {}, pre, where};
     std::string s = what;
     if (s.size() > 3 && s[0] == 'p' && s[2] == '.' && s[1] >= '1' && s[1] <= '4') {
       p.player = s[1] - '1';
@@ -110,6 +117,10 @@ bool scripted(unsigned frame, int player, Pad& out) {
   bool any = false;
   for (const Press& p : g_script) {
     if (p.player != player || p.pre != g_pre || frame < p.from || frame > p.to) continue;
+    if (p.where) {
+      int now = netplay::session_game() ? 2 : sim::epochs() ? 3 : 1;
+      if (p.where != now) continue;
+    }
     if (p.pad.x) out.x = p.pad.x;
     if (p.pad.y) out.y = p.pad.y;
     out.buttons |= p.pad.buttons;
@@ -169,6 +180,8 @@ void write(int player, const Pad& pad) {
     v[i] = (pad.buttons & bit(i)) ? 1.0f : 0.0f;
   }
 }
+
+void press(int player, int value) { pad_values(player)[value] = 1.0f; }
 
 void set_connected(int player, bool on) {
   *reinterpret_cast<uint8_t*>(game::kPads + player * game::kPadSize + game::kPadConnected) = on ? 1 : 0;

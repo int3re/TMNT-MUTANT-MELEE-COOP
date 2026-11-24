@@ -15,6 +15,7 @@
 #include "mod/menu.h"
 #include "mod/netplay.h"
 #include "mod/patch.h"
+#include "mod/rewind.h"
 #include "mod/sim.h"
 
 namespace video {
@@ -334,6 +335,7 @@ HRESULT WINAPI hkPresent(void* dev, const RECT* src, const RECT* dst, HWND wnd, 
 
 HRESULT WINAPI hkReset(void* dev, d3d8::PresentParameters* pp) {
   if (dev != g_dev) return oReset(dev, pp);
+  anew::before_reset();
   d3d8::PresentParameters mine{};
   if (pp) log_params("Reset (game)", *pp);
   if (pp && adjust(*pp, mine, g_hwnd.load())) {
@@ -375,6 +377,7 @@ HRESULT WINAPI hkSetRenderTarget(void* dev, void* target, void* depth) {
 
 void hook_device(void* dev) {
   g_dev = dev;
+  anew::on_device(dev);
   if (oPresent) return;
   void** vt = d3d8::vtable(dev);
   patch::hook("IDirect3DDevice8::SetRenderTarget", reinterpret_cast<uintptr_t>(vt[31]), (void*)&hkSetRenderTarget,
@@ -452,6 +455,10 @@ HRESULT WINAPI hkCreateDevice(void* d3d, UINT adapter, DWORD type, HWND focus, D
     if (use == &mine) {
       pp->BackBufferWidth = mine.BackBufferWidth;
       pp->BackBufferHeight = mine.BackBufferHeight;
+      // RenderWare's driver asked for a device that does not wait for the monitor and, at the first picture
+      // shown, makes it anew with the waiting on: a device reset in the game's very first frame. A window's
+      // device takes no such setting: the driver is told the waiting is on already.
+      pp->FullScreen_PresentationInterval = 1;
     }
   }
   LOGI("video: frame %dx%d%s", g_frame_w, g_frame_h, g_msaa ? ", antialiasing on" : "");

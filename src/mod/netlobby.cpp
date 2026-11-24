@@ -17,6 +17,7 @@
 #include "common/transport_enet.h"
 #include "common/transport_steam.h"
 #include "common/version.h"
+#include "mod/netplay.h"
 #include "mod/video.h"
 
 namespace netlobby {
@@ -73,8 +74,10 @@ void copy_text(char* to, size_t n, const std::string& s) {
   memcpy(to, s.data(), len);
 }
 
+// This player's name for the others: the Steam name. Without Steam: [net] name of meleenet.ini if the
+// player wrote one there, else "player" (shown as "player N").
 std::string my_name() {
-  if (g_steam && (g_cfg.net_name.empty() || g_cfg.net_name == "player")) {
+  if (g_steam) {
     std::string n = steam::my_name();
     if (!n.empty()) return n;
   }
@@ -154,6 +157,16 @@ void relaunch(const wchar_t* mode, const wchar_t* via, uint64_t peer, const std:
 // --- the game again, into the session ------------------------------------------------------
 void relaunch_now(const wchar_t* mode, const wchar_t* via, uint64_t peer, const std::string& join, int players) {
   if (g_relaunched) return;
+  if (netplay::in_place()) {
+    // The session begins in this very game: the lobby's ports are closed (the session opens its own), the
+    // page is left, and the game's memory goes back to a just started game's.
+    drop_net();
+    g_state = State::Closed;
+    std::string way;
+    for (const wchar_t* c = via; *c; ++c) way += static_cast<char>(*c);
+    netplay::begin(wcscmp(mode, L"host") == 0, way, peer, join, players);
+    return;
+  }
   g_relaunched = true;
   // (the lobby's ports and Steam are this game's until it is gone; the new one waits for that)
   drop_net();
@@ -582,7 +595,7 @@ void tick() {
           relaunch(L"host", any_steam && any_enet ? L"both" : any_steam ? L"steam" : L"enet", 0, "", g_guests + 1);
       } else {  // a guest: a moment for the answer to leave
         if (g_peers[0].via) g_peers[0].via->Poll(0);
-        if (now - g_since_ms > 400) {
+        if (now - g_since_ms > (netplay::in_place() ? 1500u : 400u)) {  // (inside the running game the host goes first)
           if (g_go.via == 2) {
             relaunch(L"join", L"steam", g_go.steam_id ? g_go.steam_id : g_peers[0].peer.id, "", g_go.players);
           } else {

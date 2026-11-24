@@ -18,6 +18,8 @@ void install(const Config& cfg);
 
 // Game frames so far.
 uint32_t frame();
+// The loading thread is inside the game's frame right now (it draws the loading screen): how many times over.
+int background_frames();
 // Game frames played without their picture so far (the PC was behind the game's clock).
 unsigned pictures_skipped();
 
@@ -30,6 +32,9 @@ bool epoch_pending();
 uint32_t epochs();
 // Game frames since the latest epoch (since the start when there was none).
 uint32_t since_epoch();
+// The start-up that is running now is played the quick way up to the main menu (no logos, eight times as
+// fast, its "press Enter" screen pressed by the mod): for a game whose session did not come about.
+void hurry_boot();
 
 // Before the process is ended by the lab's autoquit: the debug logs are written out.
 void flush();

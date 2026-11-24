@@ -37,6 +37,7 @@ struct Added {
   int friends_before = 0, type_before = 0;
   uint8_t has_friend_before = 0, hero_end_ko = 0;
   int team_ko_enemy = -1;  // the enemy record that got "end: teamko"
+  int second_lives = 0;    // enemy records of the match that have no fighter of their own
   int pads[game::kPlayers - 1] = {};
 } g_added;
 
@@ -68,29 +69,30 @@ void add_partners(uint8_t* match) {
   int n = netplay::partners(lead, pads);
   if (n <= 0) return;
   int type = i32(match, kType);
-  if (type == kBomb || type == kBalloon || type == kMecha || type == kHill || type == kAway) {
+  if (type == kBomb || type == kBalloon || type == kHill || type == kAway) {
+    // (the mini games run in a mode of their own, made for one fighter)
     LOGI("story: a match of type %d is for the hero alone", type);
     return;
   }
   int enemies = i32(match, kEnemyCount), friends = i32(match, kFriendCount);
   if (enemies < 0 || enemies > 8 || friends < 0 || friends > 8) return;
-  int fighters = 1 + friends;
+  // An enemy that comes back as another one has a second record ("next life") that gets no fighter of its
+  // own but a place among the characters to load.
+  int fighters = 1 + friends, second_lives = 0;
   for (int e = 0; e < enemies; ++e) {
-    if (i32(match, kEnemies + kRecordSize * e + kRecNextLife) != -1) {
-      // (an enemy that comes back as another one: the game counts its records by their place, and a record
-      // more would shift them)
-      LOGI("story: this match has an enemy with a second life: it is for the hero alone");
-      return;
-    }
-    ++fighters;
+    if (i32(match, kEnemies + kRecordSize * e + kRecNextLife) != -1)
+      ++second_lives;
+    else
+      ++fighters;
   }
-  if (n > kSlots - fighters) n = kSlots - fighters;
+  if (n > kSlots - fighters - second_lives) n = kSlots - fighters - second_lives;
   if (n <= 0) {
     LOGI("story: this match has no place for partners (%d fighters)", fighters);
     return;
   }
 
   g_added.match = match;
+  g_added.second_lives = second_lives;
   g_added.friends_before = friends;
   g_added.type_before = type;
   g_added.has_friend_before = match[kHasFriend];
@@ -168,8 +170,46 @@ void __fastcall hkBuild(void* self, void* edx) {
     i32(players[slot], game::kPlayerAi) = -1;                                   // a human
     players[slot][game::kPlayerPad] = static_cast<uint8_t>(g_added.pads[k]);    // this player's pad
   }
+  if (g_added.second_lives) {
+    // The game loads the characters of a list and gives the i-th to the i-th fighter. The builder puts
+    // an enemy's second life into that list right after the enemy, which is its last place in the game's
+    // own matches (the character then lands on the spare fighter after the last one). With partners
+    // after it the list is put in that order again: every fighter's character, then the second lives.
+    int* list = *reinterpret_cast<int**>(game::kCharactersToLoad);
+    int* list_end = *reinterpret_cast<int**>(game::kCharactersToLoad + 4);
+    int slots = *reinterpret_cast<const int*>(game::kPlayerCount);
+    int enemies = i32(match, kEnemyCount);
+    const int* of_slot = reinterpret_cast<const int*>(game::kStoryCharacters);
+    if (list && list_end - list == slots + g_added.second_lives && slots <= kSlots) {
+      int order[kSlots * 2], n = 0;
+      for (int s = 0; s < slots; ++s) order[n++] = of_slot[s];
+      for (int e = 0; e < enemies; ++e)
+        if (i32(match, kEnemies + kRecordSize * e + kRecNextLife) != -1) order[n++] = list[1 + e];
+      if (n == list_end - list) memcpy(list, order, n * sizeof(int));
+    } else {
+      LOGE("story: the list of characters to load is not as expected (%d entries for %d fighters)",
+           list ? static_cast<int>(list_end - list) : -1, slots);
+    }
+  }
   LOGI("story: the match is built for %d players (type %d, %d fighters)", g_added.count + 1, i32(match, kType),
        *reinterpret_cast<const int*>(game::kPlayerCount));
+}
+
+// The round's reset (0x454880) puts every record back on its fighter by the record's place in the lists:
+// the hero, enemy records 1.., friend records after them. An enemy's "next life" record has a place in the
+// list but no fighter, so in a match that has one every friend lands one fighter too far - the game's own
+// scripts never have friends there. After the game's reset the friends are put on their real fighters.
+using Reset_t = void(__fastcall*)(void*, void*);
+Reset_t oReset = nullptr;
+
+void __fastcall hkReset(void* self, void* edx) {
+  oReset(self, edx);
+  auto match = static_cast<uint8_t*>(self);
+  if (!g_added.count || g_added.match != match || !g_added.second_lives) return;
+  int enemies = i32(match, kEnemyCount), friends = i32(match, kFriendCount);
+  int first = 1 + enemies - g_added.second_lives;  // the first friend's fighter
+  auto apply = reinterpret_cast<void(__thiscall*)(void*, int)>(game::kRecordApply);
+  for (int f = 0; f < friends && first + f < kSlots; ++f) apply(match + kFriends + kRecordSize * f, first + f);
 }
 
 }  // namespace
@@ -194,6 +234,8 @@ void lab_frame(unsigned frame) {
   }
 }
 
+void reset() { g_added = Added{}; }
+
 void lab_open_stages() {
   // The story's object (0x673E30): the stages of the hero's script as a vector of pointers; a stage's state
   // at +0x194 (0 closed, 1 open, 2 passed).
@@ -214,6 +256,13 @@ void install(const Config& cfg) {
     return;
   }
   patch::hook("the story's match (partners)", game::kBuildMatch, (void*)&hkBuild, (void**)&oBuild);
+  static const uint8_t reset_head[] = {0x53, 0x55, 0x56, 0x57, 0x6A, 0x00, 0x8B, 0xF1};  // push ebx, ebp, esi, edi; push 0; mov esi, ecx
+  static const uint8_t apply_head[] = {0x8B, 0x54, 0x24, 0x04, 0x53, 0x8B, 0xC1};        // mov edx, [esp+4]; push ebx; mov eax, ecx
+  if (patch::bytes_are(game::kResetMatch, reset_head, sizeof(reset_head)) &&
+      patch::bytes_are(game::kRecordApply, apply_head, sizeof(apply_head)))
+    patch::hook("the story's round reset (partners keep their fighters)", game::kResetMatch, (void*)&hkReset, (void**)&oReset);
+  else
+    LOGW("story: the round's reset is not where it should be");
 }
 
 }  // namespace story

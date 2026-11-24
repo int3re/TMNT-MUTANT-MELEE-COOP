@@ -1225,7 +1225,8 @@ void page_game(Ctx& x, float left, float top, bool sound) {
   const Group groups[2][2] = {
       {{L"ЭКРАН", gset::kMode, gset::kFirstPicture, L"", MUTED}, {L"КАРТИНКА", gset::kFirstPicture, gset::kFirstSound, L"", MUTED}},
       {{L"СЕТЕВАЯ ИГРА", gset::kFirstSound, gset::kFirstGame,
-        std::wstring(L"Задержка ввода — у всех игроков та, что у хоста. Больше задержка — ровнее игра при плохой связи."), MUTED},
+        std::wstring(L"Над вашим бойцом — ваш ник из Steam. Задержка ввода — у всех игроков та, что у хоста: больше задержка — ровнее игра "
+                     L"при плохой связи."), MUTED},
        {L"МЫШЬ", gset::kFirstGame, gset::kRows,
         std::wstring(L"Кнопки мыши назначаются на вкладке «Управление», как клавиши."), MUTED}}};
   const Group* page = groups[sound ? 1 : 0];
@@ -1360,29 +1361,29 @@ bool demo(const std::wstring& screen, Model& m) {
   m.set.game_dir = L"D:\\Games\\TMNT Mutant Melee";
   m.inst.present = true;
   m.repo = true;
-  m.inst.version = L"0.1.1";
-  m.inst.protocol = 1;
+  m.inst.version = L"0.2.0";
+  m.inst.protocol = 2;
   m.rel.known = m.rel.full = true;
-  m.rel.version = L"0.2.0";
-  m.rel.protocol = 2;
+  m.rel.version = L"0.3.0";
+  m.rel.protocol = 3;
   m.rel.date = L"24 ноября 2026";
-  m.rel.title = L"«История» вместе, вход в идущую игру";
-  m.rel.notes = {L"«История» по сети — вместе: игроки сессии дерутся на стороне героя.",
-                 L"В идущую игру можно войти и вернуться после обрыва связи: между боями.",
-                 L"Паузу ставит любой игрок; слабый ПК не замедляет бой остальным."};
+  m.rel.title = L"Без перезапусков, имена над бойцами";
+  m.rel.notes = {L"Сетевая игра начинается прямо в запущенной игре: окна не закрываются.",
+                 L"Вход в идущую игру и возврат после обрыва — тоже без перезапуска.",
+                 L"Над бойцами — имена игроков: ники из Steam."};
   m.rel.pkg_name = L"meleenet-launcher.exe";
   m.rel.pkg_size = 4500000;
   m.rel.pkg_sha256 = "x";
   m.pack.known = true;
-  m.pack.version = L"0.1.1";
-  m.pack.protocol = 1;
-  m.pack.title = L"Меню на весь широкий экран";
-  m.pack.notes = {L"Меню заполняют широкий кадр: фоны, трубы и стены идут до краёв.",
-                  L"«Графика» → «Меню»: на весь кадр или 4:3 с полосами."};
-  m.set.notes_version = L"0.1.1";
-  m.set.notes_title = L"Меню на весь широкий экран";
-  m.set.notes = {L"Меню заполняют широкий кадр: фоны, трубы и стены идут до краёв.",
-                 L"«Графика» → «Меню»: на весь кадр или 4:3 с полосами."};
+  m.pack.version = L"0.2.0";
+  m.pack.protocol = 2;
+  m.pack.title = L"«История» вместе, вход в идущую игру";
+  m.pack.notes = {L"«История» по сети — вместе: игроки сессии дерутся на стороне героя.",
+                  L"Паузу ставит любой игрок; слабый ПК не замедляет бой остальным."};
+  m.set.notes_version = L"0.2.0";
+  m.set.notes_title = L"«История» вместе, вход в идущую игру";
+  m.set.notes = {L"«История» по сети — вместе: игроки сессии дерутся на стороне героя.",
+                 L"Паузу ставит любой игрок; слабый ПК не замедляет бой остальным."};
   m.total = 4500000;
   m.got = static_cast<uint64_t>(4500000 * 0.62);
   if (screen == L"update") {
@@ -1392,8 +1393,8 @@ bool demo(const std::wstring& screen, Model& m) {
     m.pending = Pending::Install;
   } else if (screen == L"ready") {
     m.screen = Screen::Ready;
-    m.inst.version = L"0.2.0";
-    m.inst.protocol = 2;
+    m.inst.version = L"0.3.0";
+    m.inst.protocol = 3;
   } else if (screen == L"checking") {
     m.screen = Screen::Checking;
     m.rel = Release{};
@@ -1426,16 +1427,16 @@ bool demo(const std::wstring& screen, Model& m) {
   } else if (screen == L"selfupdate") {  // at its start the launcher found a newer one and takes it by itself
     m.screen = Screen::Downloading;
     m.pending = Pending::Launcher;
-    m.inst.version = L"0.2.0";
-    m.inst.protocol = 2;
+    m.inst.version = L"0.3.0";
+    m.inst.protocol = 3;
     m.pack = m.rel;
-    m.rel.launcher_version = L"1.2.1";
+    m.rel.launcher_version = L"1.3.1";
   } else if (screen == L"graphics" || screen == L"sound" || screen == L"controls" || screen == L"controls2" ||
              screen == L"capture") {
     m.screen = Screen::Settings;
     m.back = Screen::Ready;
-    m.inst.version = L"0.2.0";
-    m.inst.protocol = 2;
+    m.inst.version = L"0.3.0";
+    m.inst.protocol = 3;
     m.tab = screen == L"graphics" ? Tab::Graphics : screen == L"sound" ? Tab::Sound : Tab::Controls;
     gset::load_canned(screen == L"controls2");
     if (screen == L"capture") m.capture = 6;

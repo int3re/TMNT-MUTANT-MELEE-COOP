@@ -18,10 +18,12 @@
 #include "mod/game.h"
 #include "mod/input.h"
 #include "mod/menu.h"
+#include "mod/nametag.h"
 #include "mod/netlobby.h"
 #include "mod/story.h"
 #include "mod/netplay.h"
 #include "mod/notice.h"
+#include "mod/rewind.h"
 #include "mod/sim.h"
 #include "mod/sound.h"
 #include "mod/video.h"
@@ -78,6 +80,8 @@ void init(const char* how) {
   sim::install(g_cfg);
   story::install(g_cfg);
   digits::install(g_cfg);
+  nametag::install(g_cfg);
+  anew::install(g_cfg);
   LOGI("meleenet ready");
 }
 

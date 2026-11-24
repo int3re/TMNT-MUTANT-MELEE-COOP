@@ -88,6 +88,8 @@ add_library(meleenet MODULE
   src/mod/input.cpp
   src/mod/sim.cpp
   src/mod/digits.cpp
+  src/mod/nametag.cpp
+  src/mod/rewind.cpp
   src/mod/story.cpp
   src/mod/sound.cpp
   src/mod/notice.cpp
@@ -96,7 +98,7 @@ add_library(meleenet MODULE
   src/mod/uiwide.cpp
   src/mod/netlobby.cpp
   src/mod/netplay.cpp)
-target_link_libraries(meleenet PRIVATE meleenet_common minhook ole32 gdi32 user32)
+target_link_libraries(meleenet PRIVATE meleenet_common minhook ole32 gdi32 user32 psapi)
 if(MELEENET_STEAM)
   # steam_api.dll is loaded only when the network page or a session asks for Steam (from the game folder).
   target_link_options(meleenet PRIVATE /DELAYLOAD:steam_api.dll)

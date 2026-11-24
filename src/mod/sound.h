@@ -10,5 +10,7 @@ void install(const Config& cfg);
 
 // At an epoch (sim.h): no line is being said, the choice of lines starts anew from `seed`.
 void on_epoch(uint32_t seed);
+// The game begins anew inside the running process: the lines' clock is a just started game's.
+void on_boot();
 
 }  // namespace sound

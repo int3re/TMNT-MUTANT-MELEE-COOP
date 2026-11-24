@@ -29,6 +29,8 @@ def main(argv):
     scripts = {1: [], 2: [], 3: [], 4: []}
     players, via, shots, out_sheet = 2, "addr", "", None
     extra = []
+    raw = {1: [], 2: [], 3: [], 4: []}
+    per = {1: [], 2: [], 3: [], 4: []}
     i = 2
     while i < len(argv):
         a = argv[i]
@@ -42,6 +44,12 @@ def main(argv):
             shots = argv[i + 1]; i += 2
         elif a == "--sheet":
             out_sheet = argv[i + 1]; i += 2
+        elif a in ("--raw1", "--raw2", "--raw3", "--raw4"):  # script lines as they are ("solo 300 down;...")
+            raw[int(a[5])] = [s.strip() for s in argv[i + 1].split(";") if s.strip()]; i += 2
+        elif a[0] == "p" and a[1] in "1234" and a[2] == ":":   # a key for one copy only
+            k, v = a[3:].split("=", 1)
+            per[int(a[1])].append("%s = %s" % (k, v))
+            i += 1
         else:
             k, v = a.split("=", 1)
             extra.append("%s = %s" % (k, v))
@@ -50,7 +58,9 @@ def main(argv):
     mock_dir = os.path.join(lab.WORK, "test-mm", "mock")
     sizes = [(1280, 720), (960, 720), (1024, 576), (800, 600)]
     for n, d in enumerate(copies):
-        ini = "[video]\nmode = window\nwindow_width = %d\nwindow_height = %d\nantialiasing = 0\n" % sizes[n]
+        # (LAB_AA=4 in the environment: the copies smooth their edges, as a player's game does)
+        ini = "[video]\nmode = window\nwindow_width = %d\nwindow_height = %d\nantialiasing = %s\n" % (
+            sizes[n] + (os.environ.get("LAB_AA", "0"),))
         ini += "[net]\nconnect = 127.0.0.1\nname = %s\ntransport = %s\n" % (
             ["Leo", "Raph", "Don", "Mike"][n], "mock" if via == "mock" else "enet")
         ini += lab.GUARD + "autoquit_frame = %d\nscript = lab-script.txt\nsim_log = 1\npage = 1\naddress = 1\n" % frames
@@ -59,12 +69,12 @@ def main(argv):
             ini += "mock_slot = %d\nmock_dir = %s\n" % (n + 1, mock_dir.replace("\\", "/"))
         if shots:
             ini += "shots = %s\n" % shots
-        ini += "\n".join(extra) + "\n"
+        ini += "\n".join(extra + per[n + 1]) + "\n"
         if n == 0:
             menu = MENU_HOST + ["menu 2600 enter"]   # НАЧАТЬ ИГРУ
         else:
             menu = MENU_GUEST_MOCK if via == "mock" else MENU_GUEST_ADDR
-        lab.install(d, ini, menu + scripts[n + 1], keep_save=(n == 0))
+        lab.install(d, ini, menu + scripts[n + 1] + raw[n + 1], keep_save=(n == 0))
         for f in ("meleenet-menu.log",):
             p = os.path.join(d, f)
             if os.path.exists(p):
